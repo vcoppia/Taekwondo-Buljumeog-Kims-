@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TKD Manager"/>
+<meta name="theme-color" content="#0f0f0f"/>
+<title>TKD Manager</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f0f;color:#f0f0f0;min-height:100vh;overscroll-behavior:none}
+:root{--red:#e63946;--gold:#f4c430;--dark:#0f0f0f;--card:#1a1a1a;--card2:#242424;--border:#2e2e2e;--muted:#888;--green:#27ae60;--blue:#2980b9}
+input,select,textarea{font-family:inherit;font-size:15px;background:#111;color:#f0f0f0;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--red)}
+select option{background:#111}
+button{cursor:pointer;font-family:inherit;border:none;outline:none}
+.hidden{display:none!important}
+/* Tabs */
+#bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:50}
+.tab-btn{padding:10px 0 20px;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:4;border-top:2px solid transparent;transition:all .2s;font-size:10px;font-weight:600}
+.tab-btn.active{color:var(--red);border-top-color:var(--red)}
+.tab-btn svg{width:22px;height:22px}
+/* Header */
+#header{background:var(--dark);position:sticky;top:0;z-index:40;border-bottom:1px solid var(--border);padding:14px 16px 12px}
+.header-inner{display:flex;align-items:center;gap:10}
+.logo{font-size:30px;line-height:1}
+.header-title{font-size:20px;font-weight:800;letter-spacing:.5px;line-height:1}
+.header-sub{font-size:11px;color:var(--muted)}
+/* Content */
+#content{padding:16px 16px 90px}
+/* Cards */
+.card{background:var(--card);border-radius:14px;padding:14px 16px;border:1px solid var(--border)}
+.card2{background:var(--card2);border-radius:12px;padding:12px 14px}
+/* Grid stats */
+.stats-grid{display:grid;gap:10;margin-bottom:16px}
+.stat-box{background:var(--card);border-radius:12px;padding:14px;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:30px;font-weight:800;line-height:1}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:3px}
+/* List items */
+.alumni-item{background:var(--card);border-radius:14px;padding:13px 15px;border:1px solid var(--border);display:flex;align-items:center;gap:13;margin-bottom:9px;cursor:pointer;transition:border-color .2s}
+.cin-badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:800;text-align:center;line-height:1.2}
+/* Tags */
+.tag{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700}
+/* Buttons */
+.btn{border-radius:12px;padding:13px 20px;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:6;width:100%;margin-bottom:8px}
+.btn-red{background:var(--red);color:#fff}
+.btn-outline-red{background:transparent;color:var(--red);border:1.5px solid var(--red)}
+.btn-outline{background:transparent;color:var(--muted);border:1.5px solid var(--border)}
+.btn-green{background:var(--green);color:#fff}
+.btn-sm{padding:8px 14px;font-size:13px;border-radius:10px;display:inline-flex;align-items:center;gap:4;font-weight:700}
+/* Field */
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:#000b;z-index:100;display:flex;align-items:flex-end}
+.modal-box{background:var(--card);width:100%;max-height:92vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:22px 18px 40px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-title{font-size:22px;font-weight:800;letter-spacing:.5px}
+.modal-close{background:#333;border-radius:50%;width:32px;height:32px;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* Search bar */
+.search-row{display:flex;gap:9px;margin-bottom:14px}
+.search-row input{flex:1}
+.add-btn{background:var(--red);border-radius:12px;padding:0 16px;color:#fff;display:flex;align-items:center;gap:4;font-weight:700;white-space:nowrap;font-size:14px}
+/* Asistencia */
+.asis-item{background:var(--card);border-radius:14px;padding:12px 15px;border:1.5px solid #2e2e2e;display:flex;align-items:center;gap:13px;margin-bottom:9px}
+.asis-btn{font-size:28px;background:none;border:2px solid var(--border);border-radius:12px;width:50px;height:50px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* Pagos */
+.pago-item{background:var(--card);border-radius:14px;padding:13px 15px;margin-bottom:9px}
+.pago-opts{display:flex;gap:6px;margin-top:9px}
+.pago-opt{flex:1;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:700;border:1.5px solid var(--border);background:var(--card2);color:var(--muted);text-align:center;line-height:1.3}
+.pago-opt.active-green{background:#27ae6022;color:var(--green);border-color:var(--green)}
+.pago-opt.active-orange{background:#f39c1222;color:#f39c12;border-color:#f39c12}
+.pago-opt.active-red{background:#e6394622;color:var(--red);border-color:var(--red)}
+/* Examenes */
+.exam-item{background:var(--card);border-radius:14px;padding:14px 15px;margin-bottom:9px;cursor:pointer}
+.prom-big{font-size:38px;font-weight:800;line-height:1}
+/* Scroll fix */
+.scroll-content{-webkit-overflow-scrolling:touch}
+/* Confirm */
+.confirm-box{background:var(--card);border-radius:16px;padding:22px 18px;margin:20px}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="header-inner">
+    <div class="logo">🥋</div>
+    <div>
+      <div class="header-title" id="page-title">Alumnos</div>
+      <div class="header-sub" id="header-sub">cargando...</div>
+    </div>
+  </div>
+</div>
+
+<div id="content" class="scroll-content"></div>
+
+<nav id="bottom-nav">
+  <button class="tab-btn active" onclick="goTab('alumnos')" id="tab-alumnos">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Alumnos
+  </button>
+  <button class="tab-btn" onclick="goTab('asistencia')" id="tab-asistencia">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 6H3v14h14v-5"/><polyline points="9 11 12 14 22 4"/></svg>
+    Asistencia
+  </button>
+  <button class="tab-btn" onclick="goTab('pagos')" id="tab-pagos">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    Pagos
+  </button>
+  <button class="tab-btn" onclick="goTab('examenes')" id="tab-examenes">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="8 21 12 17 16 21"/><line x1="12" y1="17" x2="12" y2="11"/><path d="M7 4h10l-1 7H8L7 4z"/><path d="M7 4H4v3a3 3 0 0 0 3 3"/><path d="M17 4h3v3a3 3 0 0 1-3 3"/></svg>
+    Exámenes
+  </button>
+</nav>
+
+<!-- MODAL -->
+<div class="modal-overlay hidden" id="modal" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────────
+const CIN = ["Blanco","Amarillo","Naranja","Verde","Azul","Rojo","Negro"];
+const CIN_BG = {Blanco:"#f5f5f5",Amarillo:"#f4c430",Naranja:"#e67e22",Verde:"#27ae60",Azul:"#2980b9",Rojo:"#c0392b",Negro:"#1a1a1a"};
+const CIN_FG = {Blanco:"#333",Amarillo:"#333",Naranja:"#fff",Verde:"#fff",Azul:"#fff",Rojo:"#fff",Negro:"#fff"};
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const HOY = new Date().toISOString().slice(0,10);
+const MES_ACT = new Date().getMonth();
+const ANO_ACT = new Date().getFullYear();
+
+const SEED = [
+  {id:1,nombre:"García López, Martín",dni:"12345678",nac:"2010-03-15",tel:"912-345-678",email:"martin@email.com",ingreso:"2023-02-01",cinturon:"Verde",estado:"Activo",emergencia:"Ana López 912-111-222",obs:""},
+  {id:2,nombre:"Rodríguez Paz, Sofía",dni:"23456789",nac:"2008-07-22",tel:"923-456-789",email:"sofia@email.com",ingreso:"2022-03-15",cinturon:"Azul",estado:"Activo",emergencia:"Carlos R. 923-222-333",obs:"Competidora"},
+  {id:3,nombre:"Fernández, Lucas",dni:"34567890",nac:"2012-11-08",tel:"934-567-890",email:"lucas@email.com",ingreso:"2023-08-10",cinturon:"Amarillo",estado:"Activo",emergencia:"María F. 934-333-444",obs:""},
+  {id:4,nombre:"Pérez Díaz, Valentina",dni:"45678901",nac:"2009-01-30",tel:"945-678-901",email:"vale@email.com",ingreso:"2021-01-05",cinturon:"Rojo",estado:"Activo",emergencia:"Jorge P. 945-444-555",obs:"Instructora aux."},
+  {id:5,nombre:"Morales, Andrés",dni:"56789012",nac:"2011-05-14",tel:"956-789-012",email:"andres@email.com",ingreso:"2022-06-20",cinturon:"Verde",estado:"Inactivo",emergencia:"Laura M. 956-555-666",obs:"Lesión rodilla"},
+];
+
+function ls(k,fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch{return fb;} }
+function lsSave(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
+
+let DB = {
+  alumnos: ls("tkd_alumnos", SEED),
+  asistencia: ls("tkd_asistencia", {}),
+  pagos: ls("tkd_pagos", {}),
+  examenes: ls("tkd_examenes", []),
+  cuota: ls("tkd_cuota", 25000),
+};
+function save(k){ lsSave("tkd_"+k, DB[k]); }
+
+let currentTab = "alumnos";
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+function edad(nac){
+  if(!nac) return "-";
+  const d=new Date(nac),h=new Date();
+  return h.getFullYear()-d.getFullYear()-(h<new Date(h.getFullYear(),d.getMonth(),d.getDate())?1:0);
+}
+function tagHTML(label,color){
+  return `<span class="tag" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span>`;
+}
+function estadoColor(e){ return e==="Activo"?"#27ae60":e==="Inactivo"?"#f39c12":"#e63946"; }
+function cinBadge(c,size=44){
+  return `<div class="cin-badge" style="width:${size}px;height:${size}px;background:${CIN_BG[c]};color:${CIN_FG[c]}">${c.slice(0,3).toUpperCase()}</div>`;
+}
+function cinSelect(id,val){
+  return `<select id="${id}">${CIN.map(c=>`<option${c===val?" selected":""}>${c}</option>`).join("")}</select>`;
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+function openModal(title,html){ document.getElementById("modal-title").textContent=title; document.getElementById("modal-body").innerHTML=html; document.getElementById("modal").classList.remove("hidden"); }
+function closeModal(){ document.getElementById("modal").classList.add("hidden"); }
+
+// ── Header ───────────────────────────────────────────────────────────────────
+function updateHeader(){
+  const titles={alumnos:"Alumnos",asistencia:"Asistencia",pagos:"Pagos",examenes:"Exámenes"};
+  document.getElementById("page-title").textContent=titles[currentTab];
+  const act=DB.alumnos.filter(a=>a.estado==="Activo").length;
+  document.getElementById("header-sub").textContent=`${act} alumnos activos`;
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function goTab(tab){
+  currentTab=tab;
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab-"+tab).classList.add("active");
+  updateHeader();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ALUMNOS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderAlumnos(search=""){
+  const filtrados = DB.alumnos.filter(a=>a.nombre.toLowerCase().includes(search.toLowerCase())||a.cinturon.toLowerCase().includes(search.toLowerCase()));
+  const activos=DB.alumnos.filter(a=>a.estado==="Activo").length;
+  let html=`
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+      <div class="stat-box"><div class="stat-num">${DB.alumnos.length}</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#27ae60">${activos}</div><div class="stat-lbl">Activos</div></div>
+    </div>
+    <div class="search-row">
+      <input type="search" placeholder="🔍 Buscar alumno..." oninput="renderAlumnos(this.value)" id="search-input" value="${search}"/>
+      <button class="add-btn" onclick="modalNuevoAlumno()">+ Nuevo</button>
+    </div>
+    <div id="lista-alumnos">`;
+  if(filtrados.length===0) html+=`<div style="color:var(--muted);text-align:center;padding:40px">Sin resultados</div>`;
+  filtrados.forEach(a=>{
+    html+=`<div class="alumni-item" onclick="modalVerAlumno(${a.id})">
+      ${cinBadge(a.cinturon)}
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.nombre}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Edad ${edad(a.nac)} · ${a.tel||"-"}</div>
+      </div>
+      ${tagHTML(a.estado,estadoColor(a.estado))}
+    </div>`;
+  });
+  html+=`</div>`;
+  document.getElementById("content").innerHTML=html;
+}
+
+function modalNuevoAlumno(){
+  openModal("Nuevo alumno", formAlumnoHTML({}));
+}
+
+function modalVerAlumno(id){
+  const a=DB.alumnos.find(x=>x.id===id);
+  if(!a) return;
+  openModal("Alumno",`
+    <div class="card2" style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      ${cinBadge(a.cinturon,52)}
+      <div><div style="font-weight:700;font-size:17px">${a.nombre}</div>
+      <div style="font-size:13px;color:var(--muted)">DNI: ${a.dni||"-"} · ${edad(a.nac)} años</div></div>
+    </div>
+    ${[["📅 Ingreso",a.ingreso],["📞 Teléfono",a.tel],["✉️ Email",a.email],["🆘 Emergencia",a.emergencia],["📝 Obs.",a.obs]].filter(([,v])=>v).map(([l,v])=>`
+      <div style="display:flex;gap:10px;margin-bottom:10px;font-size:14px">
+        <span style="color:var(--muted);min-width:100px">${l}</span>
+        <span style="font-weight:500">${v}</span>
+      </div>`).join("")}
+    <div style="display:flex;gap:9px;margin-top:18px">
+      <button class="btn btn-outline-red" style="width:50%" onclick="modalEditarAlumno(${id})">✏️ Editar</button>
+      <button class="btn btn-outline-red" style="width:50%;color:#e63946" onclick="confirmarEliminar(${id})">🗑 Eliminar</button>
+    </div>`);
+}
+
+function modalEditarAlumno(id){
+  const a=DB.alumnos.find(x=>x.id===id);
+  openModal("Editar alumno", formAlumnoHTML(a));
+}
+
+function confirmarEliminar(id){
+  const a=DB.alumnos.find(x=>x.id===id);
+  openModal("¿Eliminar?",`
+    <p style="color:var(--muted);margin-bottom:20px">¿Eliminar a <b>${a.nombre}</b>? No se puede deshacer.</p>
+    <div style="display:flex;gap:9px">
+      <button class="btn btn-outline" style="width:50%" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-red" style="width:50%" onclick="eliminarAlumno(${id})">Eliminar</button>
+    </div>`);
+}
+
+function formAlumnoHTML(a){
+  const isEdit=!!a.id;
+  return `
+    <div class="field"><label>Nombre completo *</label><input id="f-nombre" value="${a.nombre||""}" placeholder="Apellido, Nombre"/></div>
+    <div class="field"><label>DNI / RUT</label><input id="f-dni" value="${a.dni||""}"/></div>
+    <div class="grid2">
+      <div class="field"><label>Fecha nac.</label><input type="date" id="f-nac" value="${a.nac||""}"/></div>
+      <div class="field"><label>Ingreso</label><input type="date" id="f-ingreso" value="${a.ingreso||HOY}"/></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Cinturón</label>${cinSelect("f-cin",a.cinturon||"Blanco")}</div>
+      <div class="field"><label>Estado</label>
+        <select id="f-estado">${["Activo","Inactivo","Suspendido","Baja"].map(s=>`<option${s===a.estado?" selected":""}>${s}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="field"><label>Teléfono</label><input id="f-tel" value="${a.tel||""}"/></div>
+    <div class="field"><label>Email</label><input type="email" id="f-email" value="${a.email||""}"/></div>
+    <div class="field"><label>Contacto emergencia</label><input id="f-emer" value="${a.emergencia||""}"/></div>
+    <div class="field"><label>Observaciones</label><textarea id="f-obs" rows="2" style="resize:none">${a.obs||""}</textarea></div>
+    <div style="display:flex;gap:9px;margin-top:4px">
+      <button class="btn btn-outline" style="width:50%" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-red" style="width:50%" onclick="guardarAlumno(${a.id||0})">Guardar</button>
+    </div>`;
+}
+
+function guardarAlumno(id){
+  const g=k=>document.getElementById(k)?.value||"";
+  const nombre=g("f-nombre").trim();
+  if(!nombre){alert("Ingresá el nombre");return;}
+  const obj={nombre,dni:g("f-dni"),nac:g("f-nac"),ingreso:g("f-ingreso"),cinturon:g("f-cin"),estado:g("f-estado"),tel:g("f-tel"),email:g("f-email"),emergencia:g("f-emer"),obs:g("f-obs")};
+  if(id){
+    DB.alumnos=DB.alumnos.map(a=>a.id===id?{...a,...obj}:a);
+  } else {
+    DB.alumnos.push({...obj,id:Date.now()});
+  }
+  save("alumnos"); closeModal(); renderAlumnos();
+}
+
+function eliminarAlumno(id){
+  DB.alumnos=DB.alumnos.filter(a=>a.id!==id);
+  save("alumnos"); closeModal(); renderAlumnos();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ASISTENCIA
+// ══════════════════════════════════════════════════════════════════════════════
+let asisFecha=HOY;
+const ASIS_EST=["✅","❌","⚠️","🏥"];
+const ASIS_LBL=["Presente","Ausente","Tardanza","Justificado"];
+const ASIS_COL=["#27ae60","#e63946","#f39c12","#2980b9"];
+
+function renderAsistencia(){
+  const reg=DB.asistencia[asisFecha]||{};
+  const activos=DB.alumnos.filter(a=>a.estado==="Activo");
+  const counts=ASIS_EST.map(e=>activos.filter(a=>reg[a.id]===e).length);
+  let html=`
+    <div class="field"><label>Fecha de la clase</label>
+      <input type="date" value="${asisFecha}" onchange="asisFecha=this.value;renderAsistencia()"/>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+      ${ASIS_EST.map((e,i)=>`<div class="stat-box">
+        <div style="font-size:20px">${e}</div>
+        <div style="font-size:18px;font-weight:800;color:${ASIS_COL[i]}">${counts[i]}</div>
+        <div style="font-size:9px;color:${ASIS_COL[i]};font-weight:600">${ASIS_LBL[i]}</div>
+      </div>`).join("")}
+    </div>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="color:var(--muted);font-size:13px">Toca el ícono para cambiar</span>
+      <span style="font-weight:700;color:#27ae60">${counts[0]}/${activos.length}</span>
+    </div>`;
+  activos.forEach(a=>{
+    const est=reg[a.id]||"❌";
+    const idx=ASIS_EST.indexOf(est);
+    const col=ASIS_COL[idx]||"#e63946";
+    html+=`<div class="asis-item" style="border-color:${col}44">
+      ${cinBadge(a.cinturon)}
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:14px">${a.nombre}</div>
+        <div style="font-size:12px;color:${col};font-weight:600;margin-top:2px">${ASIS_LBL[idx]}</div>
+      </div>
+      <button class="asis-btn" style="border-color:${col}" onclick="toggleAsis(${a.id})">${est}</button>
+    </div>`;
+  });
+  document.getElementById("content").innerHTML=html;
+}
+
+function toggleAsis(id){
+  const reg=DB.asistencia[asisFecha]||{};
+  const curr=ASIS_EST.indexOf(reg[id]||"❌");
+  reg[id]=ASIS_EST[(curr+1)%ASIS_EST.length];
+  DB.asistencia[asisFecha]=reg;
+  save("asistencia"); renderAsistencia();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGOS
+// ══════════════════════════════════════════════════════════════════════════════
+let pagoMes=MES_ACT, pagoAno=ANO_ACT;
+
+function renderPagos(){
+  const key=`${pagoAno}-${pagoMes}`;
+  const reg=DB.pagos[key]||{};
+  const activos=DB.alumnos.filter(a=>a.estado==="Activo");
+  const pagados=activos.filter(a=>reg[a.id]==="✅ Pagado").length;
+  const parciales=activos.filter(a=>reg[a.id]==="🔄 Parcial").length;
+  const pendientes=activos.filter(a=>!reg[a.id]||reg[a.id]==="❌ Pendiente").length;
+  const recaudado=pagados*DB.cuota+parciales*Math.round(DB.cuota/2);
+
+  let html=`
+    <div style="display:flex;gap:9px;margin-bottom:14px">
+      <select style="flex:1" onchange="pagoMes=+this.value;renderPagos()">${MESES.map((m,i)=>`<option value="${i}"${i===pagoMes?" selected":""}>${m}</option>`).join("")}</select>
+      <select style="width:88px" onchange="pagoAno=+this.value;renderPagos()">${[2024,2025,2026].map(y=>`<option${y===pagoAno?" selected":""}>${y}</option>`).join("")}</select>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;color:var(--muted)">Valor cuota</div>
+          <div style="font-size:26px;font-weight:800;color:var(--gold);cursor:pointer" onclick="editarCuota()">$${DB.cuota.toLocaleString()} ✏️</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--muted)">Recaudado</div>
+          <div style="font-size:26px;font-weight:800;color:#27ae60">$${recaudado.toLocaleString()}</div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px">
+      <div class="stat-box"><div class="stat-num" style="color:#27ae60">${pagados}</div><div class="stat-lbl">✅ Pagados</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#f39c12">${parciales}</div><div class="stat-lbl">🔄 Parcial</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#e63946">${pendientes}</div><div class="stat-lbl">❌ Pend.</div></div>
+    </div>`;
+  activos.forEach(a=>{
+    const est=reg[a.id]||"❌ Pendiente";
+    html+=`<div class="pago-item">
+      <div style="display:flex;align-items:center;gap:12px">
+        ${cinBadge(a.cinturon,38)}
+        <div style="font-weight:600;font-size:14px">${a.nombre}</div>
+      </div>
+      <div class="pago-opts">
+        <button class="pago-opt${est==="✅ Pagado"?" active-green":""}" onclick="setPago(${a.id},'✅ Pagado')">✅<br/>Pagado</button>
+        <button class="pago-opt${est==="🔄 Parcial"?" active-orange":""}" onclick="setPago(${a.id},'🔄 Parcial')">🔄<br/>Parcial</button>
+        <button class="pago-opt${est==="❌ Pendiente"?" active-red":""}" onclick="setPago(${a.id},'❌ Pendiente')">❌<br/>Pendiente</button>
+      </div>
+    </div>`;
+  });
+  document.getElementById("content").innerHTML=html;
+}
+
+function setPago(id,est){
+  const key=`${pagoAno}-${pagoMes}`;
+  if(!DB.pagos[key]) DB.pagos[key]={};
+  DB.pagos[key][id]=est;
+  save("pagos"); renderPagos();
+}
+
+function editarCuota(){
+  openModal("Valor de cuota",`
+    <div class="field"><label>Monto cuota mensual ($)</label>
+      <input type="number" id="nueva-cuota" value="${DB.cuota}"/>
+    </div>
+    <div style="display:flex;gap:9px">
+      <button class="btn btn-outline" style="width:50%" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-green" style="width:50%" onclick="guardarCuota()">Guardar</button>
+    </div>`);
+}
+
+function guardarCuota(){
+  const v=+document.getElementById("nueva-cuota").value;
+  if(v>0){ DB.cuota=v; save("cuota"); closeModal(); renderPagos(); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXÁMENES
+// ══════════════════════════════════════════════════════════════════════════════
+function renderExamenes(){
+  const aprobados=DB.examenes.filter(e=>e.resultado==="✅ Aprobado").length;
+  const pendPago=DB.examenes.filter(e=>!e.pagado).length;
+  let html=`
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:14px">
+      <div class="stat-box"><div class="stat-num">${DB.examenes.length}</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#27ae60">${aprobados}</div><div class="stat-lbl">Aprob.</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#e63946">${pendPago}</div><div class="stat-lbl">Pend.$</div></div>
+    </div>
+    <button class="btn btn-red" style="margin-bottom:14px" onclick="modalNuevoExamen()">+ Registrar examen</button>`;
+  if(DB.examenes.length===0) html+=`<div style="color:var(--muted);text-align:center;padding:40px">Sin exámenes registrados</div>`;
+  [...DB.examenes].reverse().forEach(ex=>{
+    const a=DB.alumnos.find(x=>x.id==ex.alumnoId);
+    const nombre=a?a.nombre:"—";
+    const prom=ex.notaTec&&ex.notaAct?((+ex.notaTec+(+ex.notaAct))/2).toFixed(1):"-";
+    const col=ex.resultado==="✅ Aprobado"?"#27ae60":ex.resultado==="❌ Reprobado"?"#e63946":"#f39c12";
+    html+=`<div class="exam-item" style="border:1.5px solid ${col}44" onclick="modalVerExamen(${ex.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-weight:600;font-size:14px">${nombre}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${ex.fecha} · ${ex.cinturonActual}→${ex.cinturonObtener}</div>
+        </div>
+        <div class="prom-big" style="color:${+prom>=6?"#27ae60":+prom>0?"#e63946":"var(--muted)"}">${prom}</div>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${tagHTML(ex.resultado,col)}
+        ${tagHTML(ex.pagado?"💰 Pagado":"💳 Pendiente",ex.pagado?"#27ae60":"#e63946")}
+      </div>
+    </div>`;
+  });
+  document.getElementById("content").innerHTML=html;
+}
+
+function formExamenHTML(ex){
+  const isEdit=ex&&ex.id;
+  const alumnoOpts=DB.alumnos.filter(a=>a.estado==="Activo").map(a=>`<option value="${a.id}"${ex&&ex.alumnoId==a.id?" selected":""}>${a.nombre}</option>`).join("");
+  const prom=ex&&ex.notaTec&&ex.notaAct?((+ex.notaTec+(+ex.notaAct))/2).toFixed(1):"-";
+  return `
+    <div class="field"><label>Alumno *</label>
+      <select id="ex-alumno"><option value="">Seleccionar...</option>${alumnoOpts}</select>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Cinturón actual</label>${cinSelect("ex-cinact",ex&&ex.cinturonActual||"Blanco")}</div>
+      <div class="field"><label>A obtener</label>${cinSelect("ex-cinobt",ex&&ex.cinturonObtener||"Amarillo")}</div>
+    </div>
+    <div class="field"><label>Fecha examen</label><input type="date" id="ex-fecha" value="${ex&&ex.fecha||HOY}"/></div>
+    <div class="grid2">
+      <div class="field"><label>Nota técnica (1-10)</label><input type="number" min="1" max="10" id="ex-tec" value="${ex&&ex.notaTec||""}" placeholder="0-10" oninput="actualizarProm()"/></div>
+      <div class="field"><label>Nota actitud (1-10)</label><input type="number" min="1" max="10" id="ex-act" value="${ex&&ex.notaAct||""}" placeholder="0-10" oninput="actualizarProm()"/></div>
+    </div>
+    <div class="card2" style="text-align:center;margin-bottom:13px">
+      <div style="font-size:11px;color:var(--muted)">PROMEDIO</div>
+      <div id="prom-display" style="font-size:42px;font-weight:800;line-height:1;color:${+prom>=6?"#27ae60":+prom>0?"#e63946":"var(--muted)"}">${prom}</div>
+    </div>
+    <div class="field"><label>Resultado</label>
+      <select id="ex-res">${["✅ Aprobado","❌ Reprobado","🔄 En revisión"].map(r=>`<option${ex&&ex.resultado===r?" selected":""}>${r}</option>`).join("")}</select>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Monto examen $</label><input type="number" id="ex-monto" value="${ex&&ex.montoPago||12000}"/></div>
+      <div class="field"><label>Estado pago</label>
+        <select id="ex-pagado"><option value="si"${ex&&ex.pagado?" selected":""}>✅ Pagado</option><option value="no"${!ex||!ex.pagado?" selected":""}>❌ Pendiente</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Observaciones</label><textarea id="ex-obs" rows="2" style="resize:none">${ex&&ex.obs||""}</textarea></div>
+    <div style="display:flex;gap:9px;margin-top:4px">
+      <button class="btn btn-outline" style="width:50%" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-red" style="width:50%" onclick="guardarExamen(${isEdit?ex.id:0})">Guardar</button>
+    </div>`;
+}
+
+function actualizarProm(){
+  const t=+document.getElementById("ex-tec")?.value;
+  const a=+document.getElementById("ex-act")?.value;
+  const el=document.getElementById("prom-display");
+  if(!el) return;
+  if(t&&a){ const p=((t+a)/2).toFixed(1); el.textContent=p; el.style.color=p>=6?"#27ae60":"#e63946"; }
+  else { el.textContent="-"; el.style.color="var(--muted)"; }
+}
+
+function modalNuevoExamen(){ openModal("Nuevo examen", formExamenHTML(null)); }
+
+function modalVerExamen(id){
+  const ex=DB.examenes.find(e=>e.id===id);
+  if(!ex) return;
+  const a=DB.alumnos.find(x=>x.id==ex.alumnoId);
+  const prom=ex.notaTec&&ex.notaAct?((+ex.notaTec+(+ex.notaAct))/2).toFixed(1):"-";
+  const col=ex.resultado==="✅ Aprobado"?"#27ae60":ex.resultado==="❌ Reprobado"?"#e63946":"#f39c12";
+  openModal("Detalle examen",`
+    <div class="card2" style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:16px;margin-bottom:4px">${a?a.nombre:"—"}</div>
+      <div style="font-size:13px;color:var(--muted)">${ex.fecha}</div>
+      <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
+        ${tagHTML(ex.cinturonActual+"→"+ex.cinturonObtener,"#888")}
+        ${tagHTML(ex.resultado,col)}
+      </div>
+    </div>
+    ${[["🥋 Nota técnica",ex.notaTec||"-"],["💪 Nota actitud",ex.notaAct||"-"],["📊 Promedio",prom],["💰 Monto","$"+(ex.montoPago||0).toLocaleString()],["💳 Pago",ex.pagado?"✅ Pagado":"❌ Pendiente"],["📝 Obs.",ex.obs||"-"]].map(([l,v])=>`
+      <div style="display:flex;gap:10px;margin-bottom:10px;font-size:14px">
+        <span style="color:var(--muted);min-width:110px">${l}</span>
+        <span style="font-weight:500">${v}</span>
+      </div>`).join("")}
+    <div style="display:flex;gap:9px;margin-top:16px">
+      <button class="btn btn-outline-red" style="width:50%" onclick="modalEditarExamen(${id})">✏️ Editar</button>
+      <button class="btn btn-outline-red" style="width:50%" onclick="eliminarExamen(${id})">🗑 Eliminar</button>
+    </div>`);
+}
+
+function modalEditarExamen(id){
+  const ex=DB.examenes.find(e=>e.id===id);
+  openModal("Editar examen", formExamenHTML(ex));
+}
+
+function guardarExamen(id){
+  const g=k=>document.getElementById(k)?.value||"";
+  const alumnoId=g("ex-alumno");
+  if(!alumnoId){alert("Seleccioná un alumno");return;}
+  const obj={alumnoId,cinturonActual:g("ex-cinact"),cinturonObtener:g("ex-cinobt"),fecha:g("ex-fecha"),notaTec:g("ex-tec"),notaAct:g("ex-act"),resultado:g("ex-res"),montoPago:+g("ex-monto"),pagado:g("ex-pagado")==="si",obs:g("ex-obs")};
+  if(id){ DB.examenes=DB.examenes.map(e=>e.id===id?{...e,...obj}:e); }
+  else { DB.examenes.push({...obj,id:Date.now()}); }
+  save("examenes"); closeModal(); renderExamenes();
+}
+
+function eliminarExamen(id){
+  if(!confirm("¿Eliminar este examen?")) return;
+  DB.examenes=DB.examenes.filter(e=>e.id!==id);
+  save("examenes"); closeModal(); renderExamenes();
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render(){
+  if(currentTab==="alumnos") renderAlumnos();
+  else if(currentTab==="asistencia") renderAsistencia();
+  else if(currentTab==="pagos") renderPagos();
+  else if(currentTab==="examenes") renderExamenes();
+}
+
+render();
+updateHeader();
+</script>
+</body>
+</html>
