@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<title>Inscripción · TKD Academia</title>
+<link rel="icon" type="image/png" href="icon-192.png"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+  body{background:#0a0a0a;color:#f0f0f0;min-height:100vh;line-height:1.5;-webkit-tap-highlight-color:transparent}
+  .container{max-width:600px;margin:0 auto;padding:0 16px 40px}
+
+  /* HEADER */
+  .header{background:linear-gradient(135deg,#0a0a0a 0%,#1a0505 100%);text-align:center;padding:40px 20px 30px;margin:0 -16px 24px;border-bottom:3px solid #e63946}
+  .header .logo{font-size:54px;margin-bottom:8px;filter:drop-shadow(0 4px 12px rgba(230,57,70,0.4))}
+  .header h1{font-size:24px;letter-spacing:2px;margin-bottom:6px;font-weight:800}
+  .header h1 .red{color:#e63946}
+  .header .escuela{color:#f4c430;font-size:14px;font-weight:600;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;min-height:16px}
+  .header .subtitle{color:#888;font-size:12px;letter-spacing:1.5px;text-transform:uppercase}
+
+  /* CARDS */
+  .card{background:#181818;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid #2a2a2a}
+  .card-title{font-size:13px;color:#e63946;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card.medical .card-title{color:#3b82f6}
+  .card.consent .card-title{color:#22c55e}
+  .card.apod .card-title{color:#f59e0b}
+  .card.medical{border-color:#3b82f644}
+  .card.consent{border-color:#22c55e44}
+  .card.apod{border-color:#f59e0b44}
+
+  /* FIELDS */
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:12px;color:#aaa;margin-bottom:6px;font-weight:600;letter-spacing:0.3px}
+  .field label .req{color:#e63946;font-weight:800}
+  .field input:not([type="checkbox"]):not([type="file"]),
+  .field select,
+  .field textarea{
+    width:100%;padding:12px 14px;background:#0f0f0f;color:#fff;
+    border:1.5px solid #2a2a2a;border-radius:10px;font-size:15px;
+    font-family:inherit;outline:none;-webkit-appearance:none;transition:border-color .2s
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:#e63946}
+  .field textarea{resize:vertical;min-height:60px}
+  .field .hint{font-size:11px;color:#666;margin-top:4px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:380px){.g2{grid-template-columns:1fr}}
+
+  /* CHECKBOX */
+  .check-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;cursor:pointer;user-select:none}
+  .check-row input[type="checkbox"]{width:22px;height:22px;accent-color:#22c55e;cursor:pointer;margin-top:1px;flex-shrink:0}
+  .check-row .check-text{font-size:14px;line-height:1.4}
+  .check-row .check-text .req{color:#e63946;font-weight:800}
+  .check-row .check-text .desc{font-size:11px;color:#888;margin-top:2px}
+
+  /* FOTO */
+  .foto-zone{
+    border:2px dashed #2a2a2a;border-radius:10px;padding:20px;text-align:center;
+    cursor:pointer;background:#0f0f0f;transition:all .2s
+  }
+  .foto-zone:hover{border-color:#e63946}
+  .foto-zone.has-img{padding:8px;border-style:solid;border-color:#22c55e}
+  .foto-zone .icon{font-size:36px;margin-bottom:6px;opacity:0.5}
+  .foto-zone .txt{font-size:13px;color:#888}
+  .foto-zone .hint{font-size:11px;color:#555;margin-top:4px}
+  .foto-zone img{max-width:140px;max-height:140px;border-radius:8px;object-fit:cover}
+  .foto-zone input{display:none}
+  .foto-actions{display:flex;gap:8px;justify-content:center;margin-top:8px}
+  .foto-actions button{background:#2a2a2a;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer}
+
+  /* BUTTON */
+  .btn-submit{
+    width:100%;padding:16px;background:#e63946;color:#fff;border:none;
+    border-radius:12px;font-size:16px;font-weight:800;letter-spacing:1.5px;
+    text-transform:uppercase;cursor:pointer;margin-top:8px;
+    box-shadow:0 6px 16px rgba(230,57,70,0.3)
+  }
+  .btn-submit:active{transform:scale(0.98)}
+  .btn-submit:disabled{opacity:0.5;cursor:not-allowed;box-shadow:none}
+
+  /* ERROR / FEEDBACK */
+  .alert{padding:14px;border-radius:10px;margin-bottom:14px;font-size:13px;line-height:1.5}
+  .alert.error{background:#3a1010;border:1px solid #e63946;color:#ffc1c1}
+  .alert.info{background:#0a1a2a;border:1px solid #3b82f6;color:#a6c8ff}
+
+  /* LOADING / SUCCESS / ERROR PAGE */
+  .full-screen{position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;z-index:100}
+  .full-screen .icon{font-size:72px;margin-bottom:18px}
+  .full-screen h2{font-size:24px;margin-bottom:10px}
+  .full-screen p{color:#888;font-size:14px;max-width:380px;margin-bottom:24px;line-height:1.6}
+  .spinner{width:50px;height:50px;border:4px solid #2a2a2a;border-top-color:#e63946;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* INVALID FIELD */
+  .invalid{border-color:#e63946!important;background:#1a0505!important}
+
+  .hidden{display:none!important}
+
+  /* TIP MOVIL */
+  .mobile-tip{background:#0a1a2a;border-left:3px solid #3b82f6;padding:10px 12px;border-radius:8px;font-size:11px;color:#a6c8ff;margin-bottom:14px;line-height:1.4}
+</style>
+</head>
+<body>
+
+<!-- LOADING (al inicio) -->
+<div class="full-screen" id="loading-screen">
+  <div class="spinner"></div>
+  <h2>Cargando formulario...</h2>
+</div>
+
+<!-- ERROR LINK INVÁLIDO -->
+<div class="full-screen hidden" id="error-screen">
+  <div class="icon">⚠️</div>
+  <h2>Enlace inválido</h2>
+  <p id="error-msg">Este enlace de inscripción no es válido o ha expirado. Por favor, solicita un nuevo enlace al maestro.</p>
+</div>
+
+<!-- ENVIANDO -->
+<div class="full-screen hidden" id="sending-screen">
+  <div class="spinner"></div>
+  <h2>Enviando inscripción...</h2>
+  <p>Por favor espera unos segundos</p>
+</div>
+
+<!-- ÉXITO -->
+<div class="full-screen hidden" id="success-screen">
+  <div class="icon">✅</div>
+  <h2>¡Inscripción enviada!</h2>
+  <p id="success-msg">El maestro revisará tu inscripción y se pondrá en contacto contigo pronto. Gracias por elegir nuestra escuela.</p>
+  <p style="font-size:11px;color:#555;margin-top:20px">Puedes cerrar esta página</p>
+</div>
+
+<!-- FORMULARIO -->
+<div id="form-container" class="hidden">
+  <div class="container">
+
+    <div class="header">
+      <div class="logo">🥋</div>
+      <h1>FICHA DE<span class="red"> </span>INSCRIPCIÓN</h1>
+      <div class="escuela" id="nombre-escuela">Escuela de Taekwondo</div>
+      <div class="subtitle">Completa los datos del alumno</div>
+    </div>
+
+    <div class="mobile-tip">
+      💡 Llena el formulario con cuidado. Los campos marcados con <span style="color:#e63946;font-weight:700">*</span> son obligatorios.
+    </div>
+
+    <div id="form-error" class="alert error hidden"></div>
+
+    <!-- DATOS DEL ALUMNO -->
+    <div class="card">
+      <div class="card-title">👤 Datos del alumno</div>
+
+      <div class="field">
+        <label>Nombre completo <span class="req">*</span></label>
+        <input type="text" id="f-nombre" placeholder="Apellido, Nombre" autocomplete="name"/>
+      </div>
+
+      <div class="field">
+        <label>RUT</label>
+        <input type="text" id="f-rut" placeholder="12.345.678-9" maxlength="12" oninput="formatearRut(this)"/>
+        <div class="hint">Se formatea automáticamente al escribir</div>
+      </div>
+
+      <div class="field">
+        <label>Grupo <span class="req">*</span></label>
+        <select id="f-grupo">
+          <option value="ninos">👦 Niños</option>
+          <option value="jovenes">🧑 Jóvenes / Adultos</option>
+        </select>
+      </div>
+
+      <div class="g2">
+        <div class="field">
+          <label>Fecha de nacimiento <span class="req">*</span></label>
+          <input type="date" id="f-nac"/>
+        </div>
+        <div class="field">
+          <label>Teléfono del alumno</label>
+          <input type="tel" id="f-tel" placeholder="912345678" inputmode="numeric"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="f-email" placeholder="correo@ejemplo.cl" autocomplete="email"/>
+      </div>
+
+      <div class="field">
+        <label>Foto del alumno (opcional)</label>
+        <div class="foto-zone" id="foto-zone" onclick="document.getElementById('f-foto').click()">
+          <input type="file" id="f-foto" accept="image/*" onchange="cargarFoto(event)"/>
+          <div id="foto-empty">
+            <div class="icon">📷</div>
+            <div class="txt">Toca para tomar/elegir foto</div>
+            <div class="hint">Opcional · JPG o PNG · máx 2MB</div>
+          </div>
+          <div id="foto-preview" class="hidden">
+            <img id="foto-img" alt="Foto alumno"/>
+            <div class="foto-actions">
+              <button type="button" onclick="quitarFoto(event)">✕ Quitar foto</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATOS DEL APODERADO -->
+    <div class="card apod" id="card-apod">
+      <div class="card-title">👨‍👩‍👦 Datos del apoderado</div>
+
+      <div class="field">
+        <label>Nombre del apoderado <span class="req" id="req-apod">*</span></label>
+        <input type="text" id="f-apod-nombre" placeholder="Apellido, Nombre"/>
+      </div>
+
+      <div class="field">
+        <label>Teléfono / WhatsApp <span class="req" id="req-apod-tel">*</span></label>
+        <input type="tel" id="f-apod-tel" placeholder="912345678" inputmode="numeric"/>
+        <div class="hint">Para emergencias y comunicación</div>
+      </div>
+
+      <div class="field">
+        <label>Email del apoderado</label>
+        <input type="email" id="f-apod-email" placeholder="correo@ejemplo.cl"/>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label>Dirección</label>
+        <input type="text" id="f-direccion" placeholder="Calle, número, comuna"/>
+      </div>
+    </div>
+
+    <!-- FICHA MÉDICA -->
+    <div class="card medical">
+      <div class="card-title">🩺 Ficha médica</div>
+
+      <div class="g2">
+        <div class="field">
+          <label>Grupo sanguíneo</label>
+          <select id="f-sangre">
+            <option value="">No sé</option>
+            <option>O+</option><option>O-</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Previsión</label>
+          <select id="f-prevision">
+            <option value="">Seleccionar...</option>
+            <option>Fonasa</option>
+            <option>Isapre</option>
+            <option>Particular</option>
+            <option>Otro</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Alergias</label>
+        <input type="text" id="f-alergias" placeholder="ej: penicilina, mariscos, polvo"/>
+        <div class="hint">Si no tiene, deja vacío</div>
+      </div>
+
+      <div class="field">
+        <label>Enfermedades o condiciones</label>
+        <input type="text" id="f-enfermedades" placeholder="ej: asma, diabetes, epilepsia"/>
+      </div>
+
+      <div class="field">
+        <label>Medicamentos habituales</label>
+        <input type="text" id="f-medicamentos" placeholder="Si toma alguno, escríbelo"/>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label>Contacto de emergencia (nombre y teléfono)</label>
+        <input type="text" id="f-emergencia" placeholder="Ej: María Pérez - 912345678"/>
+      </div>
+    </div>
+
+    <!-- OBSERVACIONES -->
+    <div class="card">
+      <div class="card-title">📝 Observaciones</div>
+      <div class="field" style="margin-bottom:0">
+        <label>¿Algo más que el maestro deba saber?</label>
+        <textarea id="f-obs" placeholder="Ej: tiene experiencia previa, miedo a las patadas altas, etc."></textarea>
+      </div>
+    </div>
+
+    <!-- CONSENTIMIENTOS -->
+    <div class="card consent">
+      <div class="card-title">📋 Autorizaciones</div>
+
+      <label class="check-row">
+        <input type="checkbox" id="c-imagen"/>
+        <div class="check-text">
+          <strong>Uso de imagen</strong>
+          <div class="desc">Autorizo el uso de fotografías y videos del alumno durante clases, exhibiciones y eventos, para fines promocionales y educativos de la escuela.</div>
+        </div>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="c-medico"/>
+        <div class="check-text">
+          <strong>Atención médica de urgencia</strong>
+          <div class="desc">Autorizo a que el maestro tome las decisiones necesarias para brindar atención médica en caso de emergencia durante una clase o evento.</div>
+        </div>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="c-reglamento"/>
+        <div class="check-text">
+          <strong>Reglamento interno <span class="req">*</span></strong>
+          <div class="desc">He leído y acepto el reglamento interno de la escuela, incluyendo el respeto a las normas de disciplina, vestimenta (dobok) y el pago oportuno de mensualidades.</div>
+        </div>
+      </label>
+    </div>
+
+    <button class="btn-submit" id="btn-enviar" onclick="enviarFormulario()">
+      ✓ ENVIAR INSCRIPCIÓN
+    </button>
+
+    <div style="text-align:center;margin-top:20px;color:#444;font-size:10px;letter-spacing:1px;text-transform:uppercase">
+      TKD Academia · v1.0
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB0HAqybo2uiRVIK2odh0S-QgbSaBDIlH8",
+  authDomain: "tkd-control-5ae77.firebaseapp.com",
+  projectId: "tkd-control-5ae77",
+  storageBucket: "tkd-control-5ae77.firebasestorage.app",
+  messagingSenderId: "395276448954",
+  appId: "1:395276448954:web:fb14c176da5309e28f7e83"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Hacer disponible globalmente
+window.db = db;
+window.fsLib = { collection, doc, setDoc, getDoc };
+
+let escuelaUid = null;
+let escuelaNombre = "";
+
+// === HELPERS ===
+window.limpiarRut = function(rut){return(rut||"").replace(/[^0-9kK]/g,"").toUpperCase();};
+
+window.calcularDV = function(num){
+  var suma=0,mul=2;
+  for(var i=num.length-1;i>=0;i--){
+    suma+=parseInt(num.charAt(i),10)*mul;
+    mul=mul===7?2:mul+1;
+  }
+  var resto=11-(suma%11);
+  if(resto===11)return"0";
+  if(resto===10)return"K";
+  return String(resto);
+};
+
+window.validarRut = function(rut){
+  var r=window.limpiarRut(rut);
+  if(r.length<2)return false;
+  var num=r.slice(0,-1),dv=r.slice(-1);
+  if(!/^\d+$/.test(num))return false;
+  return window.calcularDV(num)===dv;
+};
+
+window.formatearRut = function(input){
+  var r=window.limpiarRut(input.value);
+  if(r.length<2){input.value=r;return;}
+  var num=r.slice(0,-1),dv=r.slice(-1);
+  var formateado="";
+  for(var i=num.length-1,j=0;i>=0;i--,j++){
+    if(j>0&&j%3===0)formateado="."+formateado;
+    formateado=num.charAt(i)+formateado;
+  }
+  input.value=formateado+"-"+dv;
+  if(r.length>=8){
+    input.style.borderColor=window.validarRut(r)?"#22c55e":"#e63946";
+  } else {
+    input.style.borderColor="";
+  }
+};
+
+// === FOTO ===
+window.cargarFoto = function(event){
+  var file=event.target.files[0];
+  if(!file)return;
+  if(file.size>2*1024*1024){
+    alert("La imagen es muy grande (máximo 2MB). Por favor elige una más pequeña.");
+    event.target.value="";
+    return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    // Comprimir antes de mostrar/guardar
+    var img=new Image();
+    img.onload=function(){
+      var maxW=400,maxH=400;
+      var w=img.width,h=img.height;
+      if(w>maxW){h=h*(maxW/w);w=maxW;}
+      if(h>maxH){w=w*(maxH/h);h=maxH;}
+      var canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      var ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0,w,h);
+      var dataUrl=canvas.toDataURL("image/jpeg",0.75);
+      document.getElementById("foto-img").src=dataUrl;
+      document.getElementById("foto-empty").classList.add("hidden");
+      document.getElementById("foto-preview").classList.remove("hidden");
+      document.getElementById("foto-zone").classList.add("has-img");
+      window._fotoData=dataUrl;
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.quitarFoto = function(event){
+  event.stopPropagation();
+  document.getElementById("f-foto").value="";
+  document.getElementById("foto-img").src="";
+  document.getElementById("foto-empty").classList.remove("hidden");
+  document.getElementById("foto-preview").classList.add("hidden");
+  document.getElementById("foto-zone").classList.remove("has-img");
+  window._fotoData=null;
+};
+
+// === ENVIAR ===
+window.enviarFormulario = async function(){
+  // Limpiar errores previos
+  document.querySelectorAll(".invalid").forEach(function(el){el.classList.remove("invalid");});
+  document.getElementById("form-error").classList.add("hidden");
+
+  var g=function(id){var el=document.getElementById(id);return el?el.value.trim():"";};
+  var gc=function(id){var el=document.getElementById(id);return el?!!el.checked:false;};
+  var marcarError=function(id){var el=document.getElementById(id);if(el)el.classList.add("invalid");};
+  var mostrarError=function(msg){
+    var el=document.getElementById("form-error");
+    el.textContent="⚠ "+msg;
+    el.classList.remove("hidden");
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+
+  // Validaciones
+  var nombre=g("f-nombre");
+  if(!nombre){marcarError("f-nombre");mostrarError("Falta el nombre del alumno");return;}
+
+  var grupo=g("f-grupo");
+  var nac=g("f-nac");
+  if(!nac){marcarError("f-nac");mostrarError("Falta la fecha de nacimiento");return;}
+
+  // Si es niño, apoderado obligatorio
+  if(grupo==="ninos"){
+    if(!g("f-apod-nombre")){marcarError("f-apod-nombre");mostrarError("Falta el nombre del apoderado");return;}
+    if(!g("f-apod-tel")){marcarError("f-apod-tel");mostrarError("Falta el teléfono del apoderado");return;}
+  }
+
+  // Reglamento obligatorio
+  if(!gc("c-reglamento")){
+    mostrarError("Debes aceptar el reglamento interno para inscribirte");
+    document.getElementById("c-reglamento").scrollIntoView({behavior:"smooth",block:"center"});
+    return;
+  }
+
+  // RUT si está ingresado, validar
+  var rut=g("f-rut");
+  if(rut&&!window.validarRut(rut)){
+    if(!confirm("El RUT '"+rut+"' no parece válido. ¿Continuar de todos modos?"))return;
+  }
+
+  // Mostrar pantalla de envío
+  document.getElementById("form-container").classList.add("hidden");
+  document.getElementById("sending-screen").classList.remove("hidden");
+
+  // Armar objeto
+  var inscripcion={
+    nombre:nombre,
+    rut:rut,
+    grupo:grupo,
+    nac:nac,
+    tel:g("f-tel"),
+    email:g("f-email"),
+    foto:window._fotoData||"",
+    apodNombre:g("f-apod-nombre"),
+    apodTel:g("f-apod-tel"),
+    apodEmail:g("f-apod-email"),
+    direccion:g("f-direccion"),
+    sangre:g("f-sangre"),
+    prevision:g("f-prevision"),
+    alergias:g("f-alergias"),
+    enfermedades:g("f-enfermedades"),
+    medicamentos:g("f-medicamentos"),
+    emergencia:g("f-emergencia"),
+    obs:g("f-obs"),
+    consImagen:gc("c-imagen"),
+    consMedico:gc("c-medico"),
+    consReglamento:gc("c-reglamento"),
+    fechaEnvio:new Date().toISOString(),
+    estado:"pendiente"
+  };
+
+  try{
+    var id="ins"+Date.now()+Math.random().toString(36).substring(2,8);
+    await setDoc(doc(db,"inscripciones_publicas",escuelaUid+"_"+id),Object.assign({escuelaUid:escuelaUid,id:id},inscripcion));
+    // Éxito
+    document.getElementById("sending-screen").classList.add("hidden");
+    document.getElementById("success-screen").classList.remove("hidden");
+    document.getElementById("success-msg").textContent=
+      "El maestro "+(escuelaNombre||"de la escuela")+" revisará la inscripción de "+nombre+" y se pondrá en contacto pronto.";
+  }catch(e){
+    console.error(e);
+    document.getElementById("sending-screen").classList.add("hidden");
+    document.getElementById("form-container").classList.remove("hidden");
+    mostrarError("Error al enviar: "+(e.message||e.code||"intenta de nuevo"));
+  }
+};
+
+// === INICIO ===
+async function init(){
+  var params=new URLSearchParams(window.location.search);
+  var uid=params.get("escuela");
+
+  if(!uid||uid.length<10){
+    document.getElementById("loading-screen").classList.add("hidden");
+    document.getElementById("error-screen").classList.remove("hidden");
+    return;
+  }
+
+  escuelaUid=uid;
+
+  // Intentar leer el nombre de la escuela del documento público
+  try{
+    var pubDoc=await getDoc(doc(db,"escuelas_publicas",uid));
+    if(pubDoc.exists()&&pubDoc.data().nombre){
+      escuelaNombre=pubDoc.data().nombre;
+      document.getElementById("nombre-escuela").textContent=escuelaNombre;
+    }
+  }catch(e){
+    // Si no puede leer (reglas estrictas), no pasa nada: igual permite inscribirse
+    console.log("No se pudo leer nombre de escuela:",e.message);
+  }
+
+  // Mostrar formulario
+  document.getElementById("loading-screen").classList.add("hidden");
+  document.getElementById("form-container").classList.remove("hidden");
+
+  // Toggle apoderado según grupo
+  document.getElementById("f-grupo").addEventListener("change",function(){
+    var esNino=this.value==="ninos";
+    document.getElementById("req-apod").style.display=esNino?"":"none";
+    document.getElementById("req-apod-tel").style.display=esNino?"":"none";
+  });
+}
+
+init();
+</script>
+</body>
+</html>

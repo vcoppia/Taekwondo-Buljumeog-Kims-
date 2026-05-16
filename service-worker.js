@@ -1,5 +1,5 @@
 // TKD Academia - Service Worker
-const CACHE_VERSION = 'tkd-v2.4-rut';
+const CACHE_VERSION = 'tkd-v2.5-inscripciones';
 const CACHE_FILES = [
   './',
   './index.html',
