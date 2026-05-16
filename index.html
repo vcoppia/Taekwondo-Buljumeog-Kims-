@@ -14,6 +14,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyB0HAqybo2uiRVIK2odh0S-QgbSaBDIlH8",
   authDomain: "tkd-control-5ae77.firebaseapp.com",
@@ -24,8 +25,11 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 window.db = db;
+window.auth = auth;
 window.fsLib = { collection, doc, setDoc, getDocs, deleteDoc, getDoc };
+window.authLib = { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile };
 window.firebaseReady = true;
 window.dispatchEvent(new Event("firebase-ready"));
 </script>
@@ -104,23 +108,6 @@ button{cursor:pointer;font-family:inherit;border:none;outline:none}
 .toast{position:fixed;bottom:90px;left:14px;right:14px;background:var(--card);border:1px solid var(--green);border-radius:12px;padding:14px;text-align:center;font-weight:700;z-index:500;animation:slideUp .3s}
 @keyframes slideUp{from{transform:translateY(100px);opacity:0}to{transform:translateY(0);opacity:1}}
 
-/* PIN Lock */
-#pin-lock{position:fixed;inset:0;background:#0a0a0a;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}
-.pin-logo{font-size:60px;margin-bottom:10px}
-.pin-title{font-size:22px;font-weight:800}
-.pin-sub{color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center}
-.pin-dots{display:flex;gap:14px;margin-bottom:10px}
-.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);transition:all .2s}
-.pin-dot.on{background:var(--red);border-color:var(--red);transform:scale(1.1)}
-.pin-dot.err{background:var(--red);border-color:var(--red);animation:shake .4s}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-.pin-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:280px;width:100%}
-.pin-key{aspect-ratio:1;background:var(--card);border:1px solid var(--border);border-radius:50%;font-size:26px;font-weight:600;color:#f0f0f0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .1s}
-.pin-key:active{background:var(--red);transform:scale(.95)}
-.pin-key.blank{background:transparent;border:none;cursor:default}
-.pin-key.blank:active{background:transparent;transform:none}
-.pin-err-msg{color:var(--red);font-size:13px;font-weight:600;min-height:18px}
-
 /* Dashboard */
 .dash-hero{background:linear-gradient(135deg,#e63946,#8b1a1a);border-radius:18px;padding:18px;margin-bottom:14px;color:#fff;position:relative;overflow:hidden}
 .dash-hero::before{content:'🥋';position:absolute;right:-20px;top:-10px;font-size:140px;opacity:.12;transform:rotate(-15deg)}
@@ -195,31 +182,76 @@ button{cursor:pointer;font-family:inherit;border:none;outline:none}
 </head>
 <body>
 
-<!-- PIN LOCK -->
-<div id="pin-lock" class="hidden">
-  <div class="pin-logo">🥋</div>
-  <div class="pin-title" id="pin-title">Ingresa tu PIN</div>
-  <div class="pin-sub" id="pin-sub">PIN de 4 dígitos</div>
-  <div class="pin-dots">
-    <div class="pin-dot" id="pd0"></div>
-    <div class="pin-dot" id="pd1"></div>
-    <div class="pin-dot" id="pd2"></div>
-    <div class="pin-dot" id="pd3"></div>
-  </div>
-  <div class="pin-err-msg" id="pin-err"></div>
-  <div class="pin-keys">
-    <button class="pin-key" onclick="pinPress('1')">1</button>
-    <button class="pin-key" onclick="pinPress('2')">2</button>
-    <button class="pin-key" onclick="pinPress('3')">3</button>
-    <button class="pin-key" onclick="pinPress('4')">4</button>
-    <button class="pin-key" onclick="pinPress('5')">5</button>
-    <button class="pin-key" onclick="pinPress('6')">6</button>
-    <button class="pin-key" onclick="pinPress('7')">7</button>
-    <button class="pin-key" onclick="pinPress('8')">8</button>
-    <button class="pin-key" onclick="pinPress('9')">9</button>
-    <button class="pin-key blank"></button>
-    <button class="pin-key" onclick="pinPress('0')">0</button>
-    <button class="pin-key" onclick="pinPress('back')" style="font-size:20px">⌫</button>
+<!-- AUTH SCREEN (Login / Registro / Recuperar) -->
+<div id="auth-screen" class="hidden" style="position:fixed;inset:0;background:linear-gradient(135deg,#0a0a0a 0%,#1a0505 100%);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto">
+  <div style="width:100%;max-width:380px;text-align:center">
+    <div style="font-size:64px;margin-bottom:8px">🥋</div>
+    <h1 style="color:#fff;font-size:26px;letter-spacing:2px;margin-bottom:4px;font-weight:800">TKD ACADEMIA</h1>
+    <p style="color:#888;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:30px" id="auth-subtitle">Gestión integral para tu escuela</p>
+
+    <!-- LOGIN -->
+    <div id="auth-login" style="text-align:left">
+      <h2 style="color:#fff;font-size:18px;margin-bottom:18px;text-align:center">Iniciar sesión</h2>
+      <div style="margin-bottom:12px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Email</label>
+        <input type="email" id="login-email" placeholder="tucorreo@ejemplo.cl" autocomplete="email" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div style="margin-bottom:6px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div style="text-align:right;margin-bottom:14px">
+        <a onclick="mostrarAuth('recover')" style="color:#e63946;font-size:12px;cursor:pointer;font-weight:600">¿Olvidaste tu contraseña?</a>
+      </div>
+      <div id="auth-err-login" style="color:#e63946;font-size:12px;text-align:center;min-height:18px;margin-bottom:8px"></div>
+      <button class="btn" onclick="hacerLogin()" style="background:#e63946;color:#fff;width:100%;padding:13px;border-radius:10px;font-weight:700;letter-spacing:1px;font-size:14px;text-transform:uppercase">Ingresar</button>
+      <div style="text-align:center;margin-top:20px;color:#888;font-size:13px">
+        ¿Eres nuevo? <a onclick="mostrarAuth('register')" style="color:#f4c430;cursor:pointer;font-weight:700">Crear cuenta</a>
+      </div>
+    </div>
+
+    <!-- REGISTRO -->
+    <div id="auth-register" class="hidden" style="text-align:left">
+      <h2 style="color:#fff;font-size:18px;margin-bottom:18px;text-align:center">Crear cuenta</h2>
+      <div style="margin-bottom:12px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Nombre del maestro / instructor</label>
+        <input type="text" id="reg-nombre" placeholder="Tu nombre completo" autocomplete="name" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Nombre de la escuela</label>
+        <input type="text" id="reg-escuela" placeholder="Ej: Dojang Paine" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Email</label>
+        <input type="email" id="reg-email" placeholder="tucorreo@ejemplo.cl" autocomplete="email" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Contraseña (mínimo 6 caracteres)</label>
+        <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div id="auth-err-register" style="color:#e63946;font-size:12px;text-align:center;min-height:18px;margin-bottom:8px"></div>
+      <button class="btn" onclick="hacerRegistro()" style="background:#e63946;color:#fff;width:100%;padding:13px;border-radius:10px;font-weight:700;letter-spacing:1px;font-size:14px;text-transform:uppercase">Crear cuenta</button>
+      <div style="text-align:center;margin-top:20px;color:#888;font-size:13px">
+        ¿Ya tienes cuenta? <a onclick="mostrarAuth('login')" style="color:#f4c430;cursor:pointer;font-weight:700">Iniciar sesión</a>
+      </div>
+    </div>
+
+    <!-- RECUPERAR CONTRASEÑA -->
+    <div id="auth-recover" class="hidden" style="text-align:left">
+      <h2 style="color:#fff;font-size:18px;margin-bottom:8px;text-align:center">Recuperar contraseña</h2>
+      <p style="color:#888;font-size:12px;text-align:center;margin-bottom:18px">Te enviaremos un enlace a tu email para crear una nueva contraseña</p>
+      <div style="margin-bottom:14px">
+        <label style="color:#aaa;font-size:12px;display:block;margin-bottom:6px">Email registrado</label>
+        <input type="email" id="rec-email" placeholder="tucorreo@ejemplo.cl" autocomplete="email" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);color:#fff"/>
+      </div>
+      <div id="auth-err-recover" style="font-size:12px;text-align:center;min-height:18px;margin-bottom:8px"></div>
+      <button class="btn" onclick="hacerRecuperar()" style="background:#e63946;color:#fff;width:100%;padding:13px;border-radius:10px;font-weight:700;letter-spacing:1px;font-size:14px;text-transform:uppercase">Enviar enlace</button>
+      <div style="text-align:center;margin-top:20px;color:#888;font-size:13px">
+        <a onclick="mostrarAuth('login')" style="color:#f4c430;cursor:pointer;font-weight:700">← Volver al login</a>
+      </div>
+    </div>
+
+    <div style="margin-top:30px;color:#555;font-size:10px;letter-spacing:1px;text-transform:uppercase">v 2.0 · Multi-escuela</div>
   </div>
 </div>
 
@@ -248,10 +280,10 @@ button{cursor:pointer;font-family:inherit;border:none;outline:none}
 
   <div class="drawer-section">Configuración</div>
   <div class="drawer-item" onclick="cerrarDrawer();modalEditarSede(sedeId)"><span class="ico">🏢</span> Sede actual</div>
-  <div class="drawer-item" onclick="cerrarDrawer();modalCambiarPin()"><span class="ico">🔐</span> Cambiar PIN</div>
+  <div class="drawer-item" onclick="cerrarDrawer();modalMiCuenta()"><span class="ico">👤</span> Mi cuenta</div>
   <div class="drawer-item" onclick="cerrarDrawer();modalRespaldo()"><span class="ico">💾</span> Respaldo / Restaurar</div>
   <div class="drawer-item" onclick="cerrarDrawer();exportarExcel()"><span class="ico">📗</span> Exportar a Excel</div>
-  <div class="drawer-item" onclick="cerrarDrawer();bloquear()"><span class="ico">🔒</span> Bloquear app</div>
+  <div class="drawer-item" onclick="cerrarDrawer();cerrarSesion()"><span class="ico">🚪</span> Cerrar sesión</div>
 </div>
 
 <div id="header">
@@ -358,8 +390,8 @@ let pagoMes=MES,pagoAno=ANO,pagoGrupo="ninos",examGrupo="ninos",asisGrupo="ninos
 let calMes=MES,calAno=ANO,compGrupo="ninos";
 let sedes=[],sedeId="",logoDataUrl="",diasSel=[];
 let DB={alumnos:[],asistencia:{},pagos:{},examenes:[],eventos:[],competencias:[],curriculum:{},config:{}};
-let db,fsLib;
-let pinBuffer="",pinMode="check",pinNewFirst="";
+let db,fsLib,auth,authLib;
+let currentUser=null,pendingNewUser=null;
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
 function sync(on){var b=document.getElementById("sync-bar");if(on)b.classList.add("on");else b.classList.remove("on");}
@@ -405,7 +437,7 @@ async function fsGetAll(col){var snap=await fsLib.getDocs(fsLib.collection(db,co
 async function fsDel(col,id){await fsLib.deleteDoc(fsLib.doc(db,col,id));}
 async function fsGetDoc(col,id){var d=await fsLib.getDoc(fsLib.doc(db,col,id));return d.exists()?d.data():null;}
 
-function pref(){return"s_"+sedeId+"_";}
+function pref(){return"escuelas/"+(currentUser?currentUser.uid:"_none")+"/s_"+sedeId+"_";}
 async function cargarTodo(){
   if(!sedeId)return;
   var p=pref();
@@ -435,92 +467,129 @@ async function saveCompetencia(co){await fsSet(pref()+"competencias",co.id,co);}
 async function delCompetencia(id){await fsDel(pref()+"competencias",id);}
 async function saveCurriculum(){await fsSet(pref()+"meta","curriculum",DB.curriculum);}
 async function saveConfig(){await fsSet(pref()+"meta","config",DB.config);}
-async function saveSedes(){await fsSet("config","sedes",{lista:sedes});}
-async function saveGlobalConfig(cfg){await fsSet("config","global",cfg);}
-async function getGlobalConfig(){return(await fsGetDoc("config","global"))||{};}
+async function saveSedes(){await fsSet("escuelas/"+currentUser.uid+"/meta","sedes",{lista:sedes});}
+async function getSedes(){return(await fsGetDoc("escuelas/"+currentUser.uid+"/meta","sedes"))||{};}
 
-// ── PIN LOCK ────────────────────────────────────────────────────────────────
-async function checkPinOnStart(){
-  var cfg=await getGlobalConfig();
-  if(!cfg.pinHash){pinMode="set";mostrarPin("Crea tu PIN","Define un PIN de 4 dígitos para proteger la app");}
-  else{pinMode="check";mostrarPin("Ingresa tu PIN","PIN de 4 dígitos");}
+// ── AUTH (Firebase Authentication) ──────────────────────────────────────────
+function mostrarAuth(modo){
+  document.getElementById("auth-screen").classList.remove("hidden");
+  document.getElementById("auth-login").classList.add("hidden");
+  document.getElementById("auth-register").classList.add("hidden");
+  document.getElementById("auth-recover").classList.add("hidden");
+  document.getElementById("auth-err-login").textContent="";
+  document.getElementById("auth-err-register").textContent="";
+  document.getElementById("auth-err-recover").textContent="";
+  document.getElementById("auth-err-recover").style.color="#e63946";
+  if(modo==="login")document.getElementById("auth-login").classList.remove("hidden");
+  else if(modo==="register")document.getElementById("auth-register").classList.remove("hidden");
+  else if(modo==="recover")document.getElementById("auth-recover").classList.remove("hidden");
 }
-function mostrarPin(t,s){
-  document.getElementById("pin-title").textContent=t;
-  document.getElementById("pin-sub").textContent=s;
-  document.getElementById("pin-err").textContent="";
-  document.getElementById("pin-lock").classList.remove("hidden");
-  pinBuffer="";actualizarDots();
+
+function traducirErrorAuth(code){
+  var t={
+    "auth/invalid-email":"Email inválido",
+    "auth/user-disabled":"Esta cuenta está deshabilitada",
+    "auth/user-not-found":"No existe una cuenta con ese email",
+    "auth/wrong-password":"Contraseña incorrecta",
+    "auth/invalid-credential":"Email o contraseña incorrectos",
+    "auth/email-already-in-use":"Ya existe una cuenta con ese email",
+    "auth/weak-password":"La contraseña debe tener al menos 6 caracteres",
+    "auth/network-request-failed":"Sin conexión a internet",
+    "auth/too-many-requests":"Demasiados intentos. Intenta más tarde",
+    "auth/missing-password":"Ingresa una contraseña"
+  };
+  return t[code]||"Error: "+code;
 }
-function actualizarDots(){
-  for(var i=0;i<4;i++){
-    var d=document.getElementById("pd"+i);d.classList.remove("on","err");
-    if(i<pinBuffer.length)d.classList.add("on");
+
+async function hacerLogin(){
+  var email=document.getElementById("login-email").value.trim();
+  var pass=document.getElementById("login-pass").value;
+  var errEl=document.getElementById("auth-err-login");
+  errEl.textContent="";
+  if(!email||!pass){errEl.textContent="Completa email y contraseña";return;}
+  try{
+    errEl.textContent="Ingresando...";errEl.style.color="#888";
+    await authLib.signInWithEmailAndPassword(auth,email,pass);
+    // El listener onAuthStateChanged se encarga del resto
+  }catch(e){
+    errEl.style.color="#e63946";
+    errEl.textContent=traducirErrorAuth(e.code);
   }
 }
-function pinPress(k){
-  document.getElementById("pin-err").textContent="";
-  if(k==="back"){pinBuffer=pinBuffer.slice(0,-1);actualizarDots();return;}
-  if(pinBuffer.length>=4)return;
-  pinBuffer+=k;actualizarDots();
-  if(pinBuffer.length===4)setTimeout(verificarPin,200);
-}
-async function verificarPin(){
-  var cfg=await getGlobalConfig();
-  if(pinMode==="set"){
-    if(!pinNewFirst){pinNewFirst=pinBuffer;mostrarPin("Confirma tu PIN","Repítelo para confirmar");return;}
-    if(pinNewFirst!==pinBuffer){
-      document.getElementById("pin-err").textContent="No coincide. Intenta de nuevo.";
-      pinNewFirst="";pinBuffer="";actualizarDots();
-      setTimeout(function(){mostrarPin("Crea tu PIN","Define un PIN de 4 dígitos");},800);
-      return;
-    }
-    cfg.pinHash=btoa(pinBuffer+"tkd2025");
-    await saveGlobalConfig(cfg);
-    pinNewFirst="";
-    document.getElementById("pin-lock").classList.add("hidden");
-    toast("PIN creado correctamente");
-    init2();
-  } else if(pinMode==="check"){
-    if(btoa(pinBuffer+"tkd2025")===cfg.pinHash){
-      document.getElementById("pin-lock").classList.add("hidden");
-      init2();
-    } else {
-      for(var i=0;i<4;i++)document.getElementById("pd"+i).classList.add("err");
-      document.getElementById("pin-err").textContent="PIN incorrecto";
-      setTimeout(function(){pinBuffer="";actualizarDots();},500);
-    }
-  } else if(pinMode==="change-old"){
-    if(btoa(pinBuffer+"tkd2025")===cfg.pinHash){
-      pinMode="change-new";
-      mostrarPin("Nuevo PIN","Define tu nuevo PIN de 4 dígitos");
-    } else {
-      for(var i=0;i<4;i++)document.getElementById("pd"+i).classList.add("err");
-      document.getElementById("pin-err").textContent="PIN incorrecto";
-      setTimeout(function(){pinBuffer="";actualizarDots();},500);
-    }
-  } else if(pinMode==="change-new"){
-    if(!pinNewFirst){pinNewFirst=pinBuffer;mostrarPin("Confirma nuevo PIN","Repítelo para confirmar");return;}
-    if(pinNewFirst!==pinBuffer){
-      document.getElementById("pin-err").textContent="No coincide";
-      pinNewFirst="";pinBuffer="";actualizarDots();
-      setTimeout(function(){mostrarPin("Nuevo PIN","Define tu nuevo PIN");},800);
-      return;
-    }
-    cfg.pinHash=btoa(pinBuffer+"tkd2025");
-    await saveGlobalConfig(cfg);
-    pinNewFirst="";
-    document.getElementById("pin-lock").classList.add("hidden");
-    toast("PIN actualizado");
+
+async function hacerRegistro(){
+  var nombre=document.getElementById("reg-nombre").value.trim();
+  var escuela=document.getElementById("reg-escuela").value.trim();
+  var email=document.getElementById("reg-email").value.trim();
+  var pass=document.getElementById("reg-pass").value;
+  var errEl=document.getElementById("auth-err-register");
+  errEl.textContent="";errEl.style.color="#e63946";
+  if(!nombre||!escuela||!email||!pass){errEl.textContent="Completa todos los campos";return;}
+  if(pass.length<6){errEl.textContent="La contraseña debe tener al menos 6 caracteres";return;}
+  try{
+    errEl.textContent="Creando cuenta...";errEl.style.color="#888";
+    var cred=await authLib.createUserWithEmailAndPassword(auth,email,pass);
+    await authLib.updateProfile(cred.user,{displayName:nombre});
+    // Guardamos los datos iniciales de la escuela
+    pendingNewUser={nombre:nombre,escuela:escuela};
+    // onAuthStateChanged se encarga del resto
+  }catch(e){
+    errEl.style.color="#e63946";
+    errEl.textContent=traducirErrorAuth(e.code);
   }
 }
-function modalCambiarPin(){
-  pinMode="change-old";pinNewFirst="";pinBuffer="";
-  mostrarPin("PIN actual","Ingresa tu PIN actual");
+
+async function hacerRecuperar(){
+  var email=document.getElementById("rec-email").value.trim();
+  var errEl=document.getElementById("auth-err-recover");
+  errEl.textContent="";errEl.style.color="#e63946";
+  if(!email){errEl.textContent="Ingresa tu email";return;}
+  try{
+    errEl.textContent="Enviando...";errEl.style.color="#888";
+    await authLib.sendPasswordResetEmail(auth,email);
+    errEl.style.color="#22c55e";
+    errEl.textContent="✓ Revisa tu correo para recuperar tu contraseña";
+  }catch(e){
+    errEl.style.color="#e63946";
+    errEl.textContent=traducirErrorAuth(e.code);
+  }
 }
-function bloquear(){
-  pinMode="check";pinBuffer="";
-  mostrarPin("Ingresa tu PIN","PIN de 4 dígitos");
+
+async function cerrarSesion(){
+  if(!confirm("¿Cerrar sesión?"))return;
+  try{
+    await authLib.signOut(auth);
+    location.reload();
+  }catch(e){toast("Error al cerrar sesión","#e63946");}
+}
+
+function modalMiCuenta(){
+  var u=currentUser;
+  if(!u)return;
+  var h='<div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px">'+
+    '<div style="width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#e63946,#7f1d1d);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:700;margin-bottom:14px">'+(u.displayName||u.email||"?").substring(0,1).toUpperCase()+'</div>'+
+    '<h3 style="margin-bottom:4px">'+(u.displayName||"Sin nombre")+'</h3>'+
+    '<p style="color:var(--muted);font-size:13px;margin-bottom:18px">'+u.email+'</p>'+
+    '<div style="width:100%;background:#181818;border-radius:10px;padding:14px;margin-bottom:14px;text-align:left;font-size:13px">'+
+      '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">ID de usuario</div>'+
+      '<div style="font-family:monospace;color:#aaa;font-size:11px;word-break:break-all">'+u.uid+'</div>'+
+    '</div>'+
+    '<button class="btn btn-outline-red" style="width:100%;margin-bottom:8px" onclick="cambiarContrasena()">🔑 Cambiar contraseña</button>'+
+    '<button class="btn btn-red" style="width:100%" onclick="closeModal();cerrarSesion()">🚪 Cerrar sesión</button>'+
+  '</div>';
+  openModal("Mi cuenta",h);
+}
+
+async function cambiarContrasena(){
+  if(!currentUser||!currentUser.email)return;
+  if(!confirm("Te enviaremos un email a "+currentUser.email+" con un enlace para crear una nueva contraseña. ¿Continuar?"))return;
+  try{
+    await authLib.sendPasswordResetEmail(auth,currentUser.email);
+    closeModal();
+    toast("✓ Email enviado. Revisa tu bandeja de entrada","#22c55e");
+  }catch(e){
+    toast("Error: "+traducirErrorAuth(e.code),"#e63946");
+  }
 }
 
 // ── SEDES ───────────────────────────────────────────────────────────────────
@@ -1545,26 +1614,47 @@ function render(){
 // ── INIT ────────────────────────────────────────────────────────────────────
 async function init(){
   db=window.db;fsLib=window.fsLib;
-  // PIN obligatorio: bloquear todo hasta validar
-  await checkPinOnStart();
+  auth=window.auth;authLib=window.authLib;
+  // Escuchar cambios de sesión: si hay usuario logueado entra a la app, si no muestra login
+  authLib.onAuthStateChanged(auth,async function(user){
+    if(user){
+      currentUser=user;
+      document.getElementById("auth-screen").classList.add("hidden");
+      document.getElementById("loading-screen").style.display="flex";
+      await init2();
+    } else {
+      currentUser=null;
+      document.getElementById("loading-screen").style.display="none";
+      mostrarAuth("login");
+    }
+  });
 }
+
 async function init2(){
-  // Después de validar el PIN
+  // Si es un usuario recién registrado, creamos su escuela inicial con el nombre que ingresó
   try{
-    var sedesDoc=await fsLib.getDoc(fsLib.doc(db,"config","sedes"));
+    var sedesDoc=await fsLib.getDoc(fsLib.doc(db,"escuelas/"+currentUser.uid+"/meta","sedes"));
     if(sedesDoc.exists()&&sedesDoc.data().lista&&sedesDoc.data().lista.length>0){
       sedes=sedesDoc.data().lista;
     } else {
-      sedes=[{id:"s1",nombre:"Sede Principal",logo:"",dias:[]}];
+      // Primera vez: usar el nombre de escuela del registro si existe
+      var nombreEscuela=(pendingNewUser&&pendingNewUser.escuela)||"Mi Escuela";
+      sedes=[{id:"s1",nombre:nombreEscuela,logo:"",dias:[]}];
       await saveSedes();
+      pendingNewUser=null;
+      setTimeout(function(){toast("¡Bienvenido! Tu escuela está lista","#22c55e");},1200);
     }
-  } catch(e){sedes=[{id:"s1",nombre:"Sede Principal",logo:"",dias:[]}];}
+  } catch(e){
+    console.error("Error cargando sedes:",e);
+    sedes=[{id:"s1",nombre:"Mi Escuela",logo:"",dias:[]}];
+  }
   sedeId=sedes[0].id;
   await cargarTodo();
   document.getElementById("loading-screen").style.display="none";
   updateHeader();renderSedeBar();
   goTab("dashboard");
 }
+
 window.addEventListener("firebase-ready",function(){init();});
 if(window.firebaseReady){init();}
 </script>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Limpiar datos antiguos · TKD</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+  body{background:#0a0a0a;color:#f0f0f0;min-height:100vh;padding:20px;line-height:1.5}
+  .container{max-width:760px;margin:0 auto}
+  .header{text-align:center;padding:30px 20px;border-bottom:2px solid #e63946;margin-bottom:30px}
+  .header h1{font-size:32px;letter-spacing:3px;margin-bottom:6px}
+  .header h1 .red{color:#e63946}
+  .header p{color:#888;font-size:13px;text-transform:uppercase;letter-spacing:2px}
+  .step{background:#181818;border-radius:14px;padding:22px;margin-bottom:18px;border-left:4px solid #e63946}
+  .step h2{font-size:18px;margin-bottom:10px}
+  .step p{color:#aaa;font-size:14px;margin-bottom:14px}
+  input{width:100%;padding:12px 14px;background:#0f0f0f;color:#fff;border:1.5px solid #2a2a2a;border-radius:10px;font-size:14px;margin-bottom:10px;outline:none}
+  input:focus{border-color:#e63946}
+  .btn{background:#e63946;color:#fff;border:none;padding:13px 24px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+  .btn:disabled{opacity:0.4;cursor:not-allowed}
+  .info-box{background:#3a1010;border:1px solid #e63946;border-radius:10px;padding:14px;margin:12px 0;font-size:13px;color:#ffc1c1}
+  .info-box.success{background:#0a2a15;border-color:#22c55e;color:#a6f0bf}
+  #log{background:#000;border-radius:10px;padding:14px;font-family:monospace;font-size:12px;max-height:300px;overflow-y:auto;margin-top:14px;border:1px solid #2a2a2a;color:#7f7}
+  .log-line{margin-bottom:3px}
+  .log-line.err{color:#ff7777}
+  .log-line.warn{color:#ffcc77}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>LIMPIAR<span class="red">·</span>DATOS</h1>
+    <p>Eliminar datos antiguos · v2.0</p>
+  </div>
+
+  <div class="info-box">
+    <strong>⛔ PELIGRO — Lee con atención:</strong><br><br>
+    Esta herramienta <strong>BORRA PERMANENTEMENTE</strong> los datos antiguos de Firebase.<br><br>
+    Solo úsala si:<br>
+    ✓ Ya ejecutaste el migrador<br>
+    ✓ Ya abriste la app nueva y verificaste que todos tus alumnos, pagos, etc. están ahí<br>
+    ✓ Ya hiciste un respaldo (botón "Exportar a Excel" o "Respaldo JSON")<br><br>
+    <strong>Esta acción NO se puede deshacer.</strong>
+  </div>
+
+  <div class="step">
+    <h2>Iniciar sesión</h2>
+    <p>Por seguridad, debes iniciar sesión con tu cuenta antes de borrar.</p>
+    <input type="email" id="email" placeholder="tu@email.cl"/>
+    <input type="password" id="pass" placeholder="Contraseña"/>
+    <button class="btn" onclick="login()" id="btn-login">Iniciar sesión</button>
+    <div id="login-msg" style="margin-top:10px;font-size:13px"></div>
+  </div>
+
+  <div class="step">
+    <h2>Borrar datos antiguos</h2>
+    <p>Esto eliminará las colecciones antiguas <code>s_s1_*</code>, <code>s_s2_*</code>, etc. y la <code>config</code> global.</p>
+    <p style="color:#e63946;font-weight:700">Escribe la palabra <code>BORRAR</code> para confirmar:</p>
+    <input type="text" id="confirm" placeholder="Escribe: BORRAR"/>
+    <button class="btn" onclick="limpiar()" id="btn-clean" disabled>🗑 Borrar datos antiguos</button>
+    <div id="log"></div>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+import { getFirestore, collection, doc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB0HAqybo2uiRVIK2odh0S-QgbSaBDIlH8",
+  authDomain: "tkd-control-5ae77.firebaseapp.com",
+  projectId: "tkd-control-5ae77",
+  storageBucket: "tkd-control-5ae77.firebasestorage.app",
+  messagingSenderId: "395276448954",
+  appId: "1:395276448954:web:fb14c176da5309e28f7e83"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+let currentUser = null;
+
+function log(msg, type){
+  const lg = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = 'log-line' + (type ? ' '+type : '');
+  line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  lg.appendChild(line);
+  lg.scrollTop = lg.scrollHeight;
+}
+
+window.login = async function(){
+  const email = document.getElementById('email').value.trim();
+  const pass = document.getElementById('pass').value;
+  const msg = document.getElementById('login-msg');
+  const btn = document.getElementById('btn-login');
+  msg.textContent = ''; msg.style.color = '#aaa';
+  if(!email || !pass){
+    msg.style.color = '#e63946';
+    msg.textContent = 'Completa email y contraseña';
+    return;
+  }
+  btn.disabled = true;
+  msg.textContent = 'Ingresando...';
+  try{
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    currentUser = cred.user;
+    msg.style.color = '#22c55e';
+    msg.textContent = '✓ Sesión iniciada como ' + currentUser.email;
+  }catch(e){
+    msg.style.color = '#e63946';
+    msg.textContent = '✗ ' + (e.code || e.message);
+    btn.disabled = false;
+  }
+};
+
+// Habilitar botón de limpiar solo cuando escriban BORRAR
+document.getElementById('confirm').addEventListener('input', function(e){
+  document.getElementById('btn-clean').disabled = (e.target.value.trim() !== 'BORRAR' || !currentUser);
+});
+
+window.limpiar = async function(){
+  if(!currentUser){ alert("Debes iniciar sesión primero"); return; }
+  if(document.getElementById('confirm').value.trim() !== 'BORRAR'){
+    alert("Debes escribir BORRAR para confirmar");
+    return;
+  }
+  if(!confirm("⚠ ÚLTIMA CONFIRMACIÓN ⚠\n\nSe van a BORRAR PERMANENTEMENTE los datos antiguos.\n\n¿Continuar?")) return;
+
+  const btn = document.getElementById('btn-clean');
+  btn.disabled = true;
+  btn.textContent = 'Borrando...';
+
+  let totalBorrados = 0;
+  const prefijos = ['s_s1_', 's_s2_', 's_s3_', 's_s4_', 's_s5_'];
+  const subcols = ['alumnos', 'examenes', 'eventos', 'competencias', 'meta'];
+
+  log('=== INICIO DE LIMPIEZA ===', 'warn');
+
+  try{
+    for(const pref of prefijos){
+      for(const sub of subcols){
+        const colName = pref + sub;
+        try{
+          const snap = await getDocs(collection(db, colName));
+          if(snap.empty) continue;
+          log('Borrando ' + snap.size + ' documentos de ' + colName + '...');
+          for(const d of snap.docs){
+            await deleteDoc(doc(db, colName, d.id));
+            totalBorrados++;
+          }
+        }catch(e){ /* colección no existe, continuar */ }
+      }
+    }
+
+    // Borrar config global (sedes y global con pinHash)
+    try{
+      await deleteDoc(doc(db, 'config', 'sedes'));
+      log('✓ config/sedes borrado');
+      totalBorrados++;
+    }catch(e){}
+    try{
+      await deleteDoc(doc(db, 'config', 'global'));
+      log('✓ config/global borrado (PIN antiguo)');
+      totalBorrados++;
+    }catch(e){}
+
+    log('=== LIMPIEZA COMPLETA ===', 'warn');
+    log('Total de documentos borrados: ' + totalBorrados, 'warn');
+    btn.textContent = '✓ Datos antiguos eliminados';
+    btn.style.background = '#22c55e';
+
+    const ok = document.createElement('div');
+    ok.className = 'info-box success';
+    ok.style.marginTop = '20px';
+    ok.innerHTML = '<strong>✓ Listo, Víctor.</strong><br>Los datos antiguos han sido eliminados. Tu app nueva sigue funcionando con normalidad.';
+    btn.parentNode.appendChild(ok);
+  }catch(e){
+    log('✗ ERROR: ' + e.message, 'err');
+    btn.disabled = false;
+    btn.textContent = '🔄 Reintentar';
+  }
+};
+</script>
+</body>
+</html>

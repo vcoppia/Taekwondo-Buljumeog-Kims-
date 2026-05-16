@@ -1,5 +1,5 @@
 // TKD Academia - Service Worker
-const CACHE_VERSION = 'tkd-v1';
+const CACHE_VERSION = 'tkd-v2-auth';
 const CACHE_FILES = [
   './',
   './index.html',
