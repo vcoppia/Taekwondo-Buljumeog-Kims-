@@ -1,13 +1,16 @@
 {
-  "name": "TKD Academia",
-  "short_name": "TKD",
-  "description": "Gestión integral para escuelas de Taekwondo",
+  "name": "TKD Manager - Gestión de Escuelas de Taekwondo",
+  "short_name": "TKD Manager",
+  "description": "Gestión integral para escuelas de Taekwondo: alumnos, asistencia, pagos, exámenes, eventos y comunicación con apoderados. Diseñada por y para instructores.",
+  "id": "cl.tkdmanager.app",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
-  "lang": "es",
+  "lang": "es-CL",
+  "dir": "ltr",
   "categories": ["sports", "education", "productivity"],
   "icons": [
     {
@@ -28,5 +31,6 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }
