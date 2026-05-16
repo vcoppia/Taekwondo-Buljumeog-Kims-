@@ -38,8 +38,10 @@ window.dispatchEvent(new Event("firebase-ready"));
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a0a;color:#f0f0f0;min-height:100vh;overscroll-behavior:none}
 :root{--red:#e63946;--gold:#f4c430;--dark:#0a0a0a;--card:#181818;--card2:#222;--border:#2a2a2a;--muted:#777;--green:#22c55e;--blue:#3b82f6;--purple:#a855f7;--r:14px}
-input,select,textarea{font-family:inherit;font-size:15px;background:#111;color:#f0f0f0;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;width:100%;outline:none;-webkit-appearance:none}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{font-family:inherit;font-size:15px;background:#111;color:#f0f0f0;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;width:100%;outline:none;-webkit-appearance:none}
 input:focus,select:focus,textarea:focus{border-color:var(--red)}
+input[type="checkbox"],input[type="radio"]{width:22px;height:22px;accent-color:#e63946;cursor:pointer;margin:0;flex-shrink:0}
+label:has(input[type="checkbox"]),label:has(input[type="radio"]){cursor:pointer;padding:6px 0;user-select:none}
 select option{background:#111}
 button{cursor:pointer;font-family:inherit;border:none;outline:none}
 .hidden{display:none!important}
@@ -700,7 +702,7 @@ function calcRequisitosExamen(a){
 }
 function renderAlumnos(search){
   search=search||"";
-  var filtrados=DB.alumnos.filter(function(a){return a.grupo===grupo&&(a.nombre.toLowerCase().indexOf(search.toLowerCase())>-1||(a.cinturon||"").toLowerCase().indexOf(search.toLowerCase())>-1);});
+  var filtrados=DB.alumnos.filter(function(a){var s=search.toLowerCase();return a.grupo===grupo&&(a.nombre.toLowerCase().indexOf(s)>-1||(a.cinturon||"").toLowerCase().indexOf(s)>-1||(a.rut||"").toLowerCase().indexOf(s)>-1);});
   var ninos=DB.alumnos.filter(function(a){return a.grupo==="ninos"&&a.estado==="Activo";}).length;
   var jovenes=DB.alumnos.filter(function(a){return a.grupo==="jovenes"&&a.estado==="Activo";}).length;
   var h='<div class="stats-row" style="grid-template-columns:1fr 1fr 1fr">'+
@@ -729,6 +731,7 @@ function renderAlumnos(search){
 function formAlumnoHTML(a){
   var esNino=(a.grupo||grupo)==="ninos";
   return'<div class="field"><label>Nombre *</label><input id="f-nombre" value="'+(a.nombre||"")+'" placeholder="Apellido, Nombre"/></div>'+
+    '<div class="field"><label>RUT</label><input id="f-rut" value="'+(a.rut||"")+'" placeholder="12.345.678-9" oninput="formatearRut(this)" maxlength="12"/></div>'+
     '<div class="field"><label>Grupo</label><select id="f-grupo" onchange="toggleApod()">'+
     '<option value="ninos"'+((!a.grupo||a.grupo==="ninos")?" selected":"")+'>👦 Ninos</option>'+
     '<option value="jovenes"'+(a.grupo==="jovenes"?" selected":"")+'>🧑 Jovenes</option></select></div>'+
@@ -769,6 +772,51 @@ function formAlumnoHTML(a){
     '<button class="btn btn-red" style="width:50%" onclick="guardarAlumno(\''+(a.id||"")+'\')">Guardar</button></div>';
 }
 function toggleApod(){var g=document.getElementById("f-grupo"),box=document.getElementById("apod-box");if(box)box.style.display=(g&&g.value==="ninos")?"":"none";}
+
+// Limpia el RUT (deja solo números y K)
+function limpiarRut(rut){return(rut||"").replace(/[^0-9kK]/g,"").toUpperCase();}
+
+// Calcula el dígito verificador del RUT chileno
+function calcularDV(num){
+  var suma=0,mul=2;
+  for(var i=num.length-1;i>=0;i--){
+    suma+=parseInt(num.charAt(i),10)*mul;
+    mul=mul===7?2:mul+1;
+  }
+  var resto=11-(suma%11);
+  if(resto===11)return"0";
+  if(resto===10)return"K";
+  return String(resto);
+}
+
+// Valida que el RUT sea correcto (con dígito verificador)
+function validarRut(rut){
+  var r=limpiarRut(rut);
+  if(r.length<2)return false;
+  var num=r.slice(0,-1),dv=r.slice(-1);
+  if(!/^\d+$/.test(num))return false;
+  return calcularDV(num)===dv;
+}
+
+// Formatea el RUT mientras se escribe: 123456789 → 12.345.678-9
+function formatearRut(input){
+  var r=limpiarRut(input.value);
+  if(r.length<2){input.value=r;return;}
+  var num=r.slice(0,-1),dv=r.slice(-1);
+  // Agrega puntos cada 3 dígitos desde la derecha
+  var formateado="";
+  for(var i=num.length-1,j=0;i>=0;i--,j++){
+    if(j>0&&j%3===0)formateado="."+formateado;
+    formateado=num.charAt(i)+formateado;
+  }
+  input.value=formateado+"-"+dv;
+  // Si está completo y es válido, borde verde; si está completo y es inválido, borde rojo
+  if(r.length>=8){
+    input.style.borderColor=validarRut(r)?"#22c55e":"#e63946";
+  } else {
+    input.style.borderColor="";
+  }
+}
 function modalNuevoAlumno(){openModal("Nuevo alumno",formAlumnoHTML({grupo:grupo}));}
 function modalVerAlumno(id){
   var a=DB.alumnos.find(function(x){return x.id===id;});if(!a)return;
@@ -795,16 +843,43 @@ function modalVerAlumno(id){
       medItems.map(function(x){return'<div style="display:flex;gap:10px;margin-bottom:6px;font-size:12px"><span style="color:var(--muted);min-width:90px">'+x[0]+'</span><span style="font-weight:600">'+x[1]+'</span></div>';}).join('')+'</div>';
   }
 
+  // consentimientos
+  var consItems=[
+    ["Uso de imagen (fotos, videos)",a.consImagen],
+    ["Atención médica de urgencia",a.consMedico],
+    ["Reglamento interno",a.consReglamento]
+  ];
+  var consAceptados=consItems.filter(function(x){return x[1];}).length;
+  var consColor=consAceptados===3?"#22c55e44":consAceptados===0?"#e6394644":"#f4c43044";
+  var consTitleColor=consAceptados===3?"var(--green)":consAceptados===0?"var(--red)":"var(--gold)";
+  var consHTML='<div class="card2" style="margin-bottom:12px;border:1px solid '+consColor+'">'+
+    '<div style="font-size:11px;color:'+consTitleColor+';font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">'+
+    '<span>📋 CONSENTIMIENTOS</span>'+
+    '<span style="font-size:10px">'+consAceptados+'/3</span>'+
+    '</div>'+
+    consItems.map(function(x){
+      var icon=x[1]?'<span style="color:var(--green);font-weight:800">✓</span>':'<span style="color:var(--red);font-weight:800">✗</span>';
+      var textCol=x[1]?"#f0f0f0":"var(--muted)";
+      var label=x[1]?"Autoriza":"No autoriza";
+      return'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:12px">'+
+        '<span style="width:18px;text-align:center">'+icon+'</span>'+
+        '<span style="flex:1;color:'+textCol+'">'+x[0]+'</span>'+
+        '<span style="font-size:10px;color:var(--muted);font-weight:600">'+label+'</span>'+
+        '</div>';
+    }).join('')+
+    '</div>';
+
   openModal("Alumno",
     '<div class="card2" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">'+cinBadge(a.cinturon,52)+
     '<div><div style="font-weight:800;font-size:16px">'+a.nombre+'</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-top:3px">'+(a.grupo==="ninos"?"Ninos":"Jovenes")+' · '+edad(a.nac)+' anos · '+asist.pct+'% asis</div>'+
     '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+tag(a.estado,estadoCol(a.estado))+' '+tag(a.cinturon,"#888")+'</div></div></div>'+
     reqHTML+
-    [["Ingreso",a.ingreso],["Cuota","$"+(a.cuota||0).toLocaleString()+"/mes"],["Tel",a.tel],["Email",a.email],["Apoderado",a.apodNombre],["Tel. Apod.",a.apodTel],["Obs.",a.obs]].filter(function(x){return x[1];}).map(function(x){
+    [["RUT",a.rut],["Ingreso",a.ingreso],["Cuota","$"+(a.cuota||0).toLocaleString()+"/mes"],["Tel",a.tel],["Email",a.email],["Apoderado",a.apodNombre],["Tel. Apod.",a.apodTel],["Obs.",a.obs]].filter(function(x){return x[1];}).map(function(x){
       return'<div style="display:flex;gap:10px;margin-bottom:10px;font-size:13px"><span style="color:var(--muted);min-width:90px;flex-shrink:0">'+x[0]+'</span><span style="font-weight:600">'+x[1]+'</span></div>';
     }).join('')+
     medHTML+
+    consHTML+
     '<div class="card2" style="margin-bottom:12px">'+historialHTML+'</div>'+
     '<div class="div"></div><div style="display:flex;gap:8px">'+
     '<button class="btn btn-outline-red" style="width:50%" onclick="openModal(\'Editar alumno\',formAlumnoHTML(DB.alumnos.find(function(x){return x.id===\''+id+'\';})))">✏ Editar</button>'+
@@ -821,8 +896,12 @@ async function guardarAlumno(id){
   var g=function(k){var el=document.getElementById(k);return el?el.value:"";};
   var gc=function(k){var el=document.getElementById(k);return el?!!el.checked:false;};
   var nombre=g("f-nombre").trim();if(!nombre){alert("Ingresa el nombre");return;}
+  var rutVal=g("f-rut").trim();
+  if(rutVal&&!validarRut(rutVal)){
+    if(!confirm("El RUT '"+rutVal+"' no parece válido.\n¿Deseas guardarlo de todos modos?"))return;
+  }
   var obj={
-    nombre:nombre,grupo:g("f-grupo"),nac:g("f-nac"),ingreso:g("f-ingreso"),
+    nombre:nombre,rut:g("f-rut").trim(),grupo:g("f-grupo"),nac:g("f-nac"),ingreso:g("f-ingreso"),
     cinturon:g("f-cin"),estado:g("f-estado"),fechaCinturonActual:g("f-fcin"),
     cuota:+(g("f-cuota"))||0,tel:g("f-tel"),email:g("f-email"),obs:g("f-obs"),
     apodNombre:g("f-apod-nombre"),apodTel:g("f-apod-tel"),
@@ -1390,11 +1469,9 @@ function renderDashboard(){
   var act=DB.alumnos.filter(function(a){return a.estado==="Activo";});
   var ninos=act.filter(function(a){return a.grupo==="ninos";}).length;
   var jovenes=act.filter(function(a){return a.grupo==="jovenes";}).length;
-  // Recaudación mes actual
+  // Pendientes de pago mes actual (solo cantidad, sin montos)
   var key=ANO+"-"+MES;var reg=DB.pagos[key]||{};
-  var recaudado=act.reduce(function(s,a){if(reg[a.id]==="OK")return s+(a.cuota||0);if(reg[a.id]==="P")return s+Math.round((a.cuota||0)/2);return s;},0);
   var pend=act.filter(function(a){return !reg[a.id]||reg[a.id]==="N";}).length;
-  var deuda=act.reduce(function(s,a){return(!reg[a.id]||reg[a.id]==="N")?s+(a.cuota||0):s;},0);
   // Asistencia hoy
   var asisHoy=DB.asistencia[HOY]||{};
   var presHoy=Object.values(asisHoy).filter(function(v){return v==="P";}).length;
@@ -1420,10 +1497,10 @@ function renderDashboard(){
     '<div class="sub">'+act.length+' alumnos activos · '+presHoy+' presentes hoy</div></div>'+
 
     '<div class="stats-row" style="grid-template-columns:1fr 1fr">'+
-    '<div class="stat-box" style="cursor:pointer" onclick="goTab(\'pagos\')"><div class="stat-n" style="color:var(--green)">$'+recaudado.toLocaleString()+'</div><div class="stat-l">Recaudado mes</div></div>'+
-    '<div class="stat-box" style="cursor:pointer" onclick="goTab(\'pagos\')"><div class="stat-n" style="color:var(--red)">$'+deuda.toLocaleString()+'</div><div class="stat-l">Deuda mes</div></div></div>'+
+    '<div class="stat-box"><div class="stat-n">'+ninos+'</div><div class="stat-l">Niños</div></div>'+
+    '<div class="stat-box"><div class="stat-n">'+jovenes+'</div><div class="stat-l">Jóvenes / Adultos</div></div></div>'+
 
-    // Alertas
+    // Alertas (sin montos)
     (pend>0?'<div class="alert-red"><b>⚠ '+pend+' alumno(s) con cuota pendiente</b> este mes · <a onclick="goTab(\'pagos\')" style="color:var(--red);font-weight:700;cursor:pointer">Ver →</a></div>':'')+
     (candidatos.length>0?'<div class="alert-green"><b>🎯 '+candidatos.length+' alumno(s) listo(s) para examen</b> · <a onclick="goTab(\'examenes\')" style="color:var(--green);font-weight:700;cursor:pointer">Ver →</a></div>':'')+
 
