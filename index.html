@@ -598,6 +598,9 @@ async function cambiarContrasena(){
 
 // ── INSCRIPCIONES PÚBLICAS ──────────────────────────────────────────────────
 let pendientes=[];
+let _idsPendientesConocidos=new Set();
+let _autoRefreshTimer=null;
+let _primeraCarga=true;
 
 // Guarda info pública para que el formulario sepa el nombre de la escuela
 async function actualizarEscuelaPublica(){
@@ -610,24 +613,107 @@ async function actualizarEscuelaPublica(){
   }catch(e){console.warn("No se pudo actualizar info pública:",e);}
 }
 
-// Carga las inscripciones pendientes desde Firestore
+// Carga las inscripciones pendientes desde Firestore (con detección de novedades)
 async function cargarPendientes(){
   if(!currentUser)return;
   try{
     var snap=await fsLib.getDocs(fsLib.collection(db,"inscripciones_publicas"));
+    var nuevasInscripciones=[];
     pendientes=[];
     snap.forEach(function(d){
       var data=d.data();
       if(data.escuelaUid===currentUser.uid&&data.estado==="pendiente"){
-        pendientes.push(Object.assign({_docId:d.id},data));
+        var obj=Object.assign({_docId:d.id},data);
+        pendientes.push(obj);
+        // Si NO es la primera carga y no la conocíamos → es nueva
+        if(!_primeraCarga&&!_idsPendientesConocidos.has(d.id)){
+          nuevasInscripciones.push(obj);
+        }
       }
     });
+    // Actualizar set de IDs conocidos
+    _idsPendientesConocidos=new Set(pendientes.map(function(p){return p._docId;}));
     pendientes.sort(function(a,b){return a.fechaEnvio<b.fechaEnvio?1:-1;});
     actualizarBadgePendientes();
+
+    // Si hay nuevas, notificar
+    if(nuevasInscripciones.length>0){
+      notificarInscripcionesNuevas(nuevasInscripciones);
+      // Si estoy en dashboard o inscripciones, refrescar la vista
+      if(tab==="dashboard")renderDashboard();
+      else if(tab==="inscripciones")renderInscripciones();
+    }
+    _primeraCarga=false;
   }catch(e){
     console.error("Error cargando pendientes:",e);
   }
 }
+
+// Sonido suave de notificación (dos tonos cortos tipo "ding-ding")
+function sonarNotificacion(){
+  try{
+    var ctx=new(window.AudioContext||window.webkitAudioContext)();
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.setValueAtTime(1100,ctx.currentTime+0.12);
+    gain.gain.setValueAtTime(0.001,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15,ctx.currentTime+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.35);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+0.35);
+  }catch(e){console.warn("No se pudo reproducir sonido:",e);}
+}
+
+// Vibración (solo en celulares compatibles)
+function vibrarNotificacion(){
+  try{if(navigator.vibrate)navigator.vibrate([100,50,100]);}catch(e){}
+}
+
+// Aviso visual de inscripción nueva
+function notificarInscripcionesNuevas(nuevas){
+  sonarNotificacion();
+  vibrarNotificacion();
+  var msg=nuevas.length===1?
+    "🔔 Nueva inscripción de "+nuevas[0].nombre:
+    "🔔 "+nuevas.length+" inscripciones nuevas";
+  mostrarToastInscripcion(msg);
+}
+
+// Toast clickeable más visible que el toast normal
+function mostrarToastInscripcion(msg){
+  var prev=document.getElementById("toast-insc");
+  if(prev)prev.remove();
+  var div=document.createElement("div");
+  div.id="toast-insc";
+  div.style.cssText="position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#e63946,#7f1d1d);color:#fff;padding:14px 22px;border-radius:30px;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(230,57,70,0.5);z-index:9999;cursor:pointer;animation:slideDownToast 0.4s ease-out;max-width:90%;text-align:center";
+  div.innerHTML=msg+'<div style="font-size:11px;font-weight:400;opacity:0.9;margin-top:3px">Toca para ver →</div>';
+  div.onclick=function(){div.remove();goTab("inscripciones");};
+  if(!document.getElementById("toast-anim-style")){
+    var style=document.createElement("style");
+    style.id="toast-anim-style";
+    style.textContent="@keyframes slideDownToast{from{opacity:0;transform:translate(-50%,-30px)}to{opacity:1;transform:translate(-50%,0)}}";
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(div);
+  setTimeout(function(){if(div.parentNode)div.remove();},8000);
+}
+
+// Auto-refresco cada 60 segundos
+function iniciarAutoRefresco(){
+  if(_autoRefreshTimer)clearInterval(_autoRefreshTimer);
+  _autoRefreshTimer=setInterval(function(){
+    if(currentUser&&!document.hidden)cargarPendientes();
+  },60000);
+}
+
+// Al volver a la pestaña/app, refrescar de inmediato
+document.addEventListener("visibilitychange",function(){
+  if(!document.hidden&&currentUser&&!_primeraCarga){
+    cargarPendientes();
+  }
+});
 
 function actualizarBadgePendientes(){
   var badge=document.getElementById("badge-pendientes");
@@ -690,9 +776,12 @@ function copiarLink(){
 function renderInscripciones(){
   var root=document.getElementById("app-root");
   var html='<div style="padding:14px">';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap">'+
     '<h2 style="font-size:18px">📝 Inscripciones pendientes</h2>'+
+    '<div style="display:flex;gap:6px">'+
+    '<button class="btn btn-outline" style="padding:8px 12px;font-size:12px" onclick="cargarPendientes();toast(\'Buscando inscripciones...\')">🔄 Actualizar</button>'+
     '<button class="btn btn-red" style="padding:8px 14px;font-size:12px" onclick="modalLinkInscripcion()">🔗 Generar link</button>'+
+    '</div>'+
     '</div>';
 
   if(pendientes.length===0){
@@ -2006,6 +2095,8 @@ async function init2(){
   actualizarEscuelaPublica();
   // Cargar inscripciones pendientes en segundo plano
   cargarPendientes();
+  // Iniciar auto-refresco cada 60 segundos
+  iniciarAutoRefresco();
   goTab("dashboard");
 }
 
