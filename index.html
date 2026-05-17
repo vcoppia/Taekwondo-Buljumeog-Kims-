@@ -408,6 +408,7 @@ function cinBadge(c,sz){
   else label=label.slice(0,3);
   return'<div class="cin" style="width:'+sz+'px;height:'+sz+'px;background:'+bg+';color:'+fg+'">'+label.toUpperCase()+'</div>';
 }
+function cinColor(c){return CIN_BG[c]||"#333";}
 function cinSel(id,val){return'<select id="'+id+'">'+CIN.map(function(c){return'<option'+(c===val?' selected':'')+'>'+c+'</option>';}).join('')+'</select>';}
 function estadoCol(e){return e==="Activo"?"#22c55e":e==="Inactivo"?"#f59e0b":"#e63946";}
 function limpiarTel(t){return(t||"").replace(/\D/g,"");}
@@ -1086,7 +1087,10 @@ function renderAlumnos(search){
   } else {
     filtrados.forEach(function(a){
       var asist=calcAsistencia(a.id);
-      h+='<div class="item" onclick="modalVerAlumno(\''+a.id+'\')">'+cinBadge(a.cinturon)+
+      var avatarHTML=a.foto?
+        '<img src="'+a.foto+'" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid '+cinColor(a.cinturon)+';flex-shrink:0"/>':
+        cinBadge(a.cinturon);
+      h+='<div class="item" onclick="modalVerAlumno(\''+a.id+'\')">'+avatarHTML+
         '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+a.nombre+'</div>'+
         '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+edad(a.nac)+' anos · $'+((a.cuota||0).toLocaleString())+' · '+asist.pct+'% asis</div></div>'+
         tag(a.estado,estadoCol(a.estado))+'</div>';
@@ -1096,7 +1100,19 @@ function renderAlumnos(search){
 }
 function formAlumnoHTML(a){
   var esNino=(a.grupo||grupo)==="ninos";
-  return'<div class="field"><label>Nombre *</label><input id="f-nombre" value="'+(a.nombre||"")+'" placeholder="Apellido, Nombre"/></div>'+
+  return'<div class="field" style="text-align:center;margin-bottom:14px">'+
+    '<div id="f-foto-zone" style="display:inline-block;cursor:pointer;position:relative" onclick="document.getElementById(\'f-foto-input\').click()">'+
+    '<div id="f-foto-preview" style="width:80px;height:80px;border-radius:50%;background:#181818;border:3px dashed #444;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:28px">'+
+    (a.foto?'<img src="'+a.foto+'" style="width:100%;height:100%;object-fit:cover"/>':'📷')+
+    '</div>'+
+    '<div style="position:absolute;bottom:-2px;right:-2px;width:26px;height:26px;border-radius:50%;background:#e63946;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;border:2px solid #0a0a0a">✏</div>'+
+    '</div>'+
+    '<input type="file" id="f-foto-input" accept="image/*" style="display:none" onchange="cargarFotoAlumno(event)"/>'+
+    '<input type="hidden" id="f-foto-data" value="'+(a.foto||"")+'"/>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Toca para '+(a.foto?"cambiar":"agregar")+' foto</div>'+
+    (a.foto?'<div style="margin-top:4px"><a onclick="quitarFotoAlumno()" style="color:var(--red);font-size:11px;cursor:pointer">✕ Quitar foto</a></div>':'')+
+    '</div>'+
+    '<div class="field"><label>Nombre *</label><input id="f-nombre" value="'+(a.nombre||"")+'" placeholder="Apellido, Nombre"/></div>'+
     '<div class="field"><label>RUT</label><input id="f-rut" value="'+(a.rut||"")+'" placeholder="12.345.678-9" oninput="formatearRut(this)" maxlength="12"/></div>'+
     '<div class="field"><label>Grupo</label><select id="f-grupo" onchange="toggleApod()">'+
     '<option value="ninos"'+((!a.grupo||a.grupo==="ninos")?" selected":"")+'>👦 Ninos</option>'+
@@ -1138,6 +1154,61 @@ function formAlumnoHTML(a){
     '<button class="btn btn-red" style="width:50%" onclick="guardarAlumno(\''+(a.id||"")+'\')">Guardar</button></div>';
 }
 function toggleApod(){var g=document.getElementById("f-grupo"),box=document.getElementById("apod-box");if(box)box.style.display=(g&&g.value==="ninos")?"":"none";}
+
+// === FOTO DEL ALUMNO ===
+function cargarFotoAlumno(event){
+  var file=event.target.files[0];
+  if(!file)return;
+  if(file.size>3*1024*1024){
+    alert("La imagen es muy grande (máximo 3MB). Por favor elige una más pequeña.");
+    event.target.value="";
+    return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      // Comprimir a máximo 400x400 manteniendo proporción
+      var maxW=400,maxH=400;
+      var w=img.width,h=img.height;
+      if(w>maxW){h=h*(maxW/w);w=maxW;}
+      if(h>maxH){w=w*(maxH/h);h=maxH;}
+      var canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      var ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0,w,h);
+      var dataUrl=canvas.toDataURL("image/jpeg",0.75);
+      // Actualizar preview y campo oculto
+      document.getElementById("f-foto-preview").innerHTML='<img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover"/>';
+      document.getElementById("f-foto-preview").style.borderStyle="solid";
+      document.getElementById("f-foto-preview").style.borderColor="#22c55e";
+      document.getElementById("f-foto-data").value=dataUrl;
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarFotoAlumno(){
+  if(!confirm("¿Quitar la foto?"))return;
+  document.getElementById("f-foto-preview").innerHTML='📷';
+  document.getElementById("f-foto-preview").style.borderStyle="dashed";
+  document.getElementById("f-foto-preview").style.borderColor="#444";
+  document.getElementById("f-foto-data").value="";
+  document.getElementById("f-foto-input").value="";
+}
+
+// Ver foto del alumno en grande
+function modalVerFoto(id){
+  var a=DB.alumnos.find(function(x){return x.id===id;});
+  if(!a||!a.foto)return;
+  openModal(a.nombre,
+    '<div style="text-align:center">'+
+    '<img src="'+a.foto+'" style="max-width:100%;max-height:60vh;border-radius:12px;border:3px solid '+cinColor(a.cinturon)+'"/>'+
+    '<div style="margin-top:14px"><button class="btn btn-outline" onclick="modalVerAlumno(\''+id+'\')">← Volver</button></div>'+
+    '</div>'
+  );
+}
 
 // Limpia el RUT (deja solo números y K)
 function limpiarRut(rut){return(rut||"").replace(/[^0-9kK]/g,"").toUpperCase();}
@@ -1236,7 +1307,10 @@ function modalVerAlumno(id){
     '</div>';
 
   openModal("Alumno",
-    '<div class="card2" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">'+cinBadge(a.cinturon,52)+
+    '<div class="card2" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">'+
+    (a.foto?
+      '<img src="'+a.foto+'" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid '+cinColor(a.cinturon)+';flex-shrink:0;cursor:pointer" onclick="modalVerFoto(\''+id+'\')"/>':
+      cinBadge(a.cinturon,52))+
     '<div><div style="font-weight:800;font-size:16px">'+a.nombre+'</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-top:3px">'+(a.grupo==="ninos"?"Ninos":"Jovenes")+' · '+edad(a.nac)+' anos · '+asist.pct+'% asis</div>'+
     '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+tag(a.estado,estadoCol(a.estado))+' '+tag(a.cinturon,"#888")+'</div></div></div>'+
@@ -1266,6 +1340,7 @@ async function guardarAlumno(id){
   if(rutVal&&!validarRut(rutVal)){
     if(!confirm("El RUT '"+rutVal+"' no parece válido.\n¿Deseas guardarlo de todos modos?"))return;
   }
+  var fotoData=document.getElementById("f-foto-data");
   var obj={
     nombre:nombre,rut:g("f-rut").trim(),grupo:g("f-grupo"),nac:g("f-nac"),ingreso:g("f-ingreso"),
     cinturon:g("f-cin"),estado:g("f-estado"),fechaCinturonActual:g("f-fcin"),
@@ -1273,7 +1348,8 @@ async function guardarAlumno(id){
     apodNombre:g("f-apod-nombre"),apodTel:g("f-apod-tel"),
     sangre:g("f-sangre"),prevision:g("f-prevision"),alergias:g("f-alergias"),
     enfermedades:g("f-enfermedades"),medicamentos:g("f-medicamentos"),emergencia:g("f-emergencia"),
-    consImagen:gc("f-cons-imagen"),consMedico:gc("f-cons-medico"),consReglamento:gc("f-cons-reglamento")
+    consImagen:gc("f-cons-imagen"),consMedico:gc("f-cons-medico"),consReglamento:gc("f-cons-reglamento"),
+    foto:fotoData?fotoData.value:""
   };
   if(id){
     obj.id=id;
