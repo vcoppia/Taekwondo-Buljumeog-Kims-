@@ -1,5 +1,5 @@
 // TKD Academia - Service Worker
-const CACHE_VERSION = 'tkd-v2.9-suscripcion';
+const CACHE_VERSION = 'tkd-v3.1-planes';
 const CACHE_FILES = [
   './',
   './index.html',

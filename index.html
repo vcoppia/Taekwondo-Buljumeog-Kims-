@@ -285,6 +285,7 @@ button{cursor:pointer;font-family:inherit;border:none;outline:none}
   <div class="drawer-section">Configuración</div>
   <div class="drawer-item" onclick="cerrarDrawer();modalEditarSede(sedeId)"><span class="ico">🏢</span> Sede actual</div>
   <div class="drawer-item" onclick="cerrarDrawer();modalMiCuenta()"><span class="ico">👤</span> Mi cuenta</div>
+  <div class="drawer-item" onclick="cerrarDrawer();modalPlanes()"><span class="ico">💎</span> Planes de suscripción</div>
   <div class="drawer-item" onclick="cerrarDrawer();modalRespaldo()"><span class="ico">💾</span> Respaldo / Restaurar</div>
   <div class="drawer-item" onclick="cerrarDrawer();exportarExcel()"><span class="ico">📗</span> Exportar a Excel</div>
   <div class="drawer-item" onclick="cerrarDrawer();cerrarSesion()"><span class="ico">🚪</span> Cerrar sesión</div>
@@ -399,7 +400,20 @@ let currentUser=null,pendingNewUser=null;
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
 function sync(on){var b=document.getElementById("sync-bar");if(on)b.classList.add("on");else b.classList.remove("on");}
-function edad(nac){if(!nac)return"?";var d=new Date(nac),h=new Date();return h.getFullYear()-d.getFullYear()-(h<new Date(h.getFullYear(),d.getMonth(),d.getDate())?1:0);}
+// Parsea fecha YYYY-MM-DD sin afectarse por zona horaria
+function parseFecha(s){
+  if(!s)return null;
+  // Si viene como YYYY-MM-DD, parseamos manual (evita UTC shift)
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3]); // mes 0-indexado
+  return new Date(s);
+}
+function edad(nac){
+  if(!nac)return"?";
+  var d=parseFecha(nac);if(!d)return"?";
+  var h=new Date();
+  return h.getFullYear()-d.getFullYear()-(h<new Date(h.getFullYear(),d.getMonth(),d.getDate())?1:0);
+}
 function tag(txt,color){return'<span class="tag" style="background:'+color+'20;color:'+color+';border:1px solid '+color+'40">'+txt+'</span>';}
 function cinBadge(c,sz){
   sz=sz||42;var bg=CIN_BG[c]||"#333",fg=CIN_FG[c]||"#fff",label=c||"?";
@@ -609,17 +623,21 @@ function modalMiCuenta(){
     }
   }
 
+  var esVip=userSub&&(userSub.tipo==="vip"||userSub.tipo==="permanente");
+  var botonPlanes=esVip?"":'<button class="btn btn-red" style="width:100%;margin-bottom:8px;padding:13px;font-weight:700" onclick="closeModal();setTimeout(modalPlanes,200)">💎 Ver planes de suscripción</button>';
+
   var h='<div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px">'+
     '<div style="width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#e63946,#7f1d1d);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:700;margin-bottom:14px">'+(u.displayName||u.email||"?").substring(0,1).toUpperCase()+'</div>'+
     '<h3 style="margin-bottom:4px">'+(u.displayName||"Sin nombre")+'</h3>'+
     '<p style="color:var(--muted);font-size:13px;margin-bottom:18px">'+u.email+'</p>'+
     subHTML+
+    botonPlanes+
     '<div style="width:100%;background:#181818;border-radius:10px;padding:14px;margin-bottom:14px;text-align:left;font-size:13px">'+
       '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">ID de usuario</div>'+
       '<div style="font-family:monospace;color:#aaa;font-size:11px;word-break:break-all">'+u.uid+'</div>'+
     '</div>'+
     '<button class="btn btn-outline-red" style="width:100%;margin-bottom:8px" onclick="cambiarContrasena()">🔑 Cambiar contraseña</button>'+
-    '<button class="btn btn-red" style="width:100%" onclick="closeModal();cerrarSesion()">🚪 Cerrar sesión</button>'+
+    '<button class="btn btn-outline" style="width:100%" onclick="closeModal();cerrarSesion()">🚪 Cerrar sesión</button>'+
   '</div>';
   openModal("Mi cuenta",h);
 }
@@ -1957,8 +1975,8 @@ function renderDashboard(){
   var asisHoy=DB.asistencia[HOY]||{};
   var presHoy=Object.values(asisHoy).filter(function(v){return v==="P";}).length;
   // Cumpleaños del mes
-  var bdays=DB.alumnos.filter(function(a){if(!a.nac)return false;return new Date(a.nac).getMonth()===MES;});
-  bdays.sort(function(a,b){return new Date(a.nac).getDate()-new Date(b.nac).getDate();});
+  var bdays=DB.alumnos.filter(function(a){if(!a.nac)return false;var d=parseFecha(a.nac);return d&&d.getMonth()===MES;});
+  bdays.sort(function(a,b){return parseFecha(a.nac).getDate()-parseFecha(b.nac).getDate();});
   // Candidatos a examen
   var candidatos=act.filter(function(a){return calcRequisitosExamen(a).ok;});
   // Próximo evento
@@ -2004,7 +2022,7 @@ function renderDashboard(){
   else{
     h+='<div class="dash-card">';
     bdays.forEach(function(a){
-      var dia=new Date(a.nac).getDate();
+      var dia=parseFecha(a.nac).getDate();
       var hoyDia=new Date().getDate();
       var esHoy=dia===hoyDia;
       h+='<div class="bday-item">'+
@@ -2195,6 +2213,14 @@ let userSub=null; // {tipo, vence, activa}
 const DIAS_PRUEBA=7;
 const MS_DIA=24*60*60*1000;
 
+// Configuración de planes (puedes ajustar precios cuando quieras)
+const PLANES={
+  mensual:{nombre:"Plan Mensual",precio:4000,periodo:"al mes"},
+  anual:{nombre:"Plan Anual",precio:36000,periodo:"al año",ahorro:"3 meses gratis"}
+};
+const WHATSAPP_SOPORTE="56947526995"; // Tu número sin "+"
+const NOMBRE_ADMIN="Víctor Coppia";
+
 // Carga o crea la suscripción del usuario actual
 async function cargarOCrearSuscripcion(){
   try{
@@ -2245,19 +2271,26 @@ function bannerSuscripcionHTML(){
   var dias=diasRestantes();
   if(dias>3)return""; // No mostrar si quedan más de 3 días
   if(dias<=0){
-    return'<div style="background:#3a1010;border:2px solid #e63946;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">'+
-      '<div style="font-size:24px;margin-bottom:6px">🔒</div>'+
-      '<div style="font-weight:800;color:#e63946;margin-bottom:4px">Tu periodo de prueba expiró</div>'+
-      '<div style="font-size:12px;color:#ffc1c1">La app pasó a modo solo lectura. Contacta al administrador para reactivarla.</div>'+
+    return'<div style="background:#3a1010;border:2px solid #e63946;border-radius:12px;padding:16px;margin-bottom:14px;text-align:center">'+
+      '<div style="font-size:30px;margin-bottom:6px">🔒</div>'+
+      '<div style="font-weight:800;color:#e63946;margin-bottom:4px;font-size:15px">Tu periodo de prueba expiró</div>'+
+      '<div style="font-size:12px;color:#ffc1c1;margin-bottom:12px">La app está en modo solo lectura</div>'+
+      '<button class="btn btn-red" style="width:100%;padding:11px;font-size:13px;font-weight:700" onclick="modalPlanes()">💎 Ver planes y suscribirme</button>'+
       '</div>';
   }
   if(dias===1){
-    return'<div style="background:#3a1010;border:1px solid #e63946;border-radius:10px;padding:12px;margin-bottom:14px;color:#ffc1c1;font-size:13px">'+
-      '<b>⚠ Último día de prueba</b><br>Tu acceso completo vence hoy. Contacta al administrador para continuar.'+
+    return'<div style="background:#3a1010;border:1px solid #e63946;border-radius:10px;padding:12px;margin-bottom:14px">'+
+      '<div style="color:#ffc1c1;font-size:13px;margin-bottom:10px">'+
+      '<b>⚠ Último día de prueba</b><br>Tu acceso completo vence hoy.'+
+      '</div>'+
+      '<button class="btn btn-red" style="width:100%;padding:9px;font-size:12px" onclick="modalPlanes()">💎 Ver planes</button>'+
       '</div>';
   }
-  return'<div style="background:#3a2510;border:1px solid #f4c430;border-radius:10px;padding:12px;margin-bottom:14px;color:#ffd97a;font-size:13px">'+
-    '<b>⏰ Quedan '+dias+' días de prueba</b><br>Después de este periodo, la app pasará a modo solo lectura.'+
+  return'<div style="background:#3a2510;border:1px solid #f4c430;border-radius:10px;padding:12px;margin-bottom:14px">'+
+    '<div style="color:#ffd97a;font-size:13px;margin-bottom:10px">'+
+    '<b>⏰ Quedan '+dias+' días de prueba</b><br>Después la app pasará a modo solo lectura.'+
+    '</div>'+
+    '<button class="btn btn-outline-red" style="width:100%;padding:9px;font-size:12px" onclick="modalPlanes()">💎 Ver planes</button>'+
     '</div>';
 }
 
@@ -2270,23 +2303,83 @@ function bloquearSiVencido(accion){
 
 // Modal cuando se intenta escribir sin tener suscripción vigente
 function mostrarModalExpirado(){
-  var dias=diasRestantes();
   openModal("🔒 Modo solo lectura",
-    '<div style="text-align:center;padding:10px">'+
-    '<div style="font-size:54px;margin-bottom:12px">🔒</div>'+
-    '<h3 style="color:#e63946;margin-bottom:10px">Periodo de prueba expirado</h3>'+
-    '<p style="color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:14px">'+
-    'Tu periodo de prueba de '+DIAS_PRUEBA+' días terminó.<br>'+
-    'La app está en <b>modo solo lectura</b>: puedes ver toda tu información pero no agregar/editar nuevos datos.</p>'+
-    '<div class="card2" style="text-align:left;margin-bottom:14px;font-size:13px">'+
-    '<div style="color:var(--muted);margin-bottom:6px">📊 Tus datos están a salvo:</div>'+
-    '<div>✓ Alumnos, pagos, asistencia: visibles</div>'+
-    '<div>✓ Exámenes y eventos: visibles</div>'+
-    '<div>✓ Inscripciones: visibles</div>'+
+    '<div style="text-align:center;padding:6px">'+
+    '<div style="font-size:54px;margin-bottom:8px">🔒</div>'+
+    '<h3 style="color:#e63946;margin-bottom:8px">Tu periodo de prueba terminó</h3>'+
+    '<p style="color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:12px">'+
+    'Tus datos están a salvo, pero para seguir usando la app necesitas una suscripción.</p>'+
+    '<button class="btn btn-red" style="width:100%;padding:13px;font-size:14px;margin-bottom:8px" onclick="modalPlanes()">💎 Ver planes y suscribirme</button>'+
+    '<button class="btn btn-outline" style="width:100%" onclick="closeModal()">Entendido</button>'+
+    '</div>'
+  );
+}
+
+// Modal con los planes de suscripción y botones para contactarme
+function modalPlanes(){
+  var mensual=PLANES.mensual,anual=PLANES.anual;
+  var emailUsuario=(currentUser&&currentUser.email)||"";
+  var nombreUsuario=(currentUser&&currentUser.displayName)||"";
+
+  // Mensajes pre-armados para WhatsApp
+  var msgMensual="Hola "+NOMBRE_ADMIN+"! 👋\n\nQuiero suscribirme al *Plan Mensual* ($"+mensual.precio.toLocaleString("es-CL")+" CLP) de TKD Manager.\n\nMi cuenta:\n📧 "+emailUsuario+"\n👤 "+nombreUsuario+"\n\nPor favor envíame los datos para realizar la transferencia. ¡Gracias!";
+  var msgAnual="Hola "+NOMBRE_ADMIN+"! 👋\n\nQuiero suscribirme al *Plan Anual* ($"+anual.precio.toLocaleString("es-CL")+" CLP) de TKD Manager.\n\nMi cuenta:\n📧 "+emailUsuario+"\n👤 "+nombreUsuario+"\n\nPor favor envíame los datos para realizar la transferencia. ¡Gracias!";
+  var msgConsulta="Hola "+NOMBRE_ADMIN+"! Tengo una consulta sobre los planes de TKD Manager.";
+
+  var urlMensual="https://wa.me/"+WHATSAPP_SOPORTE+"?text="+encodeURIComponent(msgMensual);
+  var urlAnual="https://wa.me/"+WHATSAPP_SOPORTE+"?text="+encodeURIComponent(msgAnual);
+  var urlConsulta="https://wa.me/"+WHATSAPP_SOPORTE+"?text="+encodeURIComponent(msgConsulta);
+
+  openModal("💎 Planes de suscripción",
+    '<div style="text-align:center;padding-bottom:8px">'+
+
+    // Plan Mensual
+    '<div style="background:#181818;border:1px solid #2a2a2a;border-radius:14px;padding:18px;margin-bottom:12px;text-align:left">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+        '<div style="font-weight:800;font-size:16px">📅 '+mensual.nombre+'</div>'+
+        '<div style="background:#2a2a2a;padding:3px 10px;border-radius:10px;font-size:10px;color:var(--muted);font-weight:700">Flexible</div>'+
+      '</div>'+
+      '<div style="font-size:28px;font-weight:800;color:#e63946;margin-bottom:2px">$'+mensual.precio.toLocaleString("es-CL")+'</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">CLP '+mensual.periodo+'</div>'+
+      '<button class="btn btn-outline-red" style="width:100%;padding:12px;font-size:13px;font-weight:700" onclick="window.open(\''+urlMensual+'\',\'_blank\')">💬 Suscribirme - Mensual</button>'+
     '</div>'+
-    '<p style="font-size:12px;color:var(--muted);margin-bottom:14px">'+
-    'Para reactivar tu cuenta, contacta al administrador.</p>'+
-    '<button class="btn btn-outline" onclick="closeModal()" style="width:100%">Entendido</button>'+
+
+    // Plan Anual (destacado)
+    '<div style="background:linear-gradient(135deg,#1a0a0a,#2a0505);border:2px solid #e63946;border-radius:14px;padding:18px;margin-bottom:12px;text-align:left;position:relative">'+
+      '<div style="position:absolute;top:-10px;right:14px;background:#f4c430;color:#000;padding:3px 12px;border-radius:12px;font-size:10px;font-weight:800;letter-spacing:0.5px">✨ MEJOR OPCIÓN</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:4px">'+
+        '<div style="font-weight:800;font-size:16px">🏆 '+anual.nombre+'</div>'+
+        '<div style="background:#22c55e22;color:#22c55e;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:700">'+anual.ahorro+'</div>'+
+      '</div>'+
+      '<div style="font-size:28px;font-weight:800;color:#e63946;margin-bottom:2px">$'+anual.precio.toLocaleString("es-CL")+'</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">CLP '+anual.periodo+'</div>'+
+      '<div style="font-size:11px;color:#22c55e;margin-bottom:14px;font-weight:600">Equivale a solo $'+Math.round(anual.precio/12).toLocaleString("es-CL")+' / mes</div>'+
+      '<button class="btn btn-red" style="width:100%;padding:13px;font-size:14px;font-weight:800" onclick="window.open(\''+urlAnual+'\',\'_blank\')">💬 Suscribirme - Anual</button>'+
+    '</div>'+
+
+    // Qué incluyen
+    '<div class="card2" style="text-align:left;padding:14px;margin-bottom:12px">'+
+      '<div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">✅ Ambos planes incluyen</div>'+
+      '<div style="font-size:12px;line-height:1.7">'+
+        '✓ Alumnos ilimitados<br>'+
+        '✓ Control de asistencia<br>'+
+        '✓ Gestión de pagos<br>'+
+        '✓ Exámenes y cinturones<br>'+
+        '✓ Eventos y competencias<br>'+
+        '✓ Formulario de inscripción público<br>'+
+        '✓ Exportación a Excel<br>'+
+        '✓ Soporte por WhatsApp'+
+      '</div>'+
+    '</div>'+
+
+    // Info de pago
+    '<div style="background:#0a1a2a;border:1px solid #3b82f6;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;text-align:left;color:#a6c8ff">'+
+      '<b>💳 Cómo pagar:</b><br>'+
+      'Al tocar "Suscribirme", se abrirá WhatsApp para contactar al administrador. Él te enviará los datos para transferencia bancaria.'+
+    '</div>'+
+
+    '<button class="btn btn-outline" style="width:100%" onclick="window.open(\''+urlConsulta+'\',\'_blank\')">❓ Hacer una consulta</button>'+
+
     '</div>'
   );
 }
