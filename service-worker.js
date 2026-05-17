@@ -1,5 +1,5 @@
 // TKD Academia - Service Worker
-const CACHE_VERSION = 'tkd-v2.8-foto-alumno';
+const CACHE_VERSION = 'tkd-v2.9-suscripcion';
 const CACHE_FILES = [
   './',
   './index.html',

@@ -437,9 +437,25 @@ function mesesEntre(d1,d2){if(!d1||!d2)return 0;var a=new Date(d1),b=new Date(d2
 function diasEntre(d1,d2){if(!d1||!d2)return 0;return Math.round((new Date(d2)-new Date(d1))/(1000*60*60*24));}
 
 // ── FIREBASE ────────────────────────────────────────────────────────────────
-async function fsSet(col,id,data){sync(true);await fsLib.setDoc(fsLib.doc(db,col,id),data);sync(false);}
+async function fsSet(col,id,data){
+  // Si la suscripción venció, bloquear escrituras EXCEPTO para suscripcion y escuelas_publicas
+  if(userSub&&!suscripcionVigente()){
+    var esExcepcion=col.indexOf("escuelas_publicas")===0||(col.indexOf("/meta")>-1&&id==="suscripcion");
+    if(!esExcepcion){
+      mostrarModalExpirado();
+      throw new Error("Suscripción expirada - operación bloqueada");
+    }
+  }
+  sync(true);await fsLib.setDoc(fsLib.doc(db,col,id),data);sync(false);
+}
 async function fsGetAll(col){var snap=await fsLib.getDocs(fsLib.collection(db,col));var r=[];snap.forEach(function(d){r.push(Object.assign({id:d.id},d.data()));});return r;}
-async function fsDel(col,id){await fsLib.deleteDoc(fsLib.doc(db,col,id));}
+async function fsDel(col,id){
+  if(userSub&&!suscripcionVigente()){
+    mostrarModalExpirado();
+    throw new Error("Suscripción expirada - operación bloqueada");
+  }
+  await fsLib.deleteDoc(fsLib.doc(db,col,id));
+}
 async function fsGetDoc(col,id){var d=await fsLib.getDoc(fsLib.doc(db,col,id));return d.exists()?d.data():null;}
 
 function pref(){return"escuelas/"+(currentUser?currentUser.uid:"_none")+"/s_"+sedeId+"_";}
@@ -571,10 +587,33 @@ async function cerrarSesion(){
 function modalMiCuenta(){
   var u=currentUser;
   if(!u)return;
+  // Info de suscripción
+  var subHTML="";
+  if(userSub){
+    if(userSub.tipo==="vip"||userSub.tipo==="permanente"){
+      subHTML='<div style="width:100%;background:linear-gradient(135deg,#f4c430,#b8860b);border-radius:10px;padding:14px;margin-bottom:14px;text-align:center;color:#000">'+
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:700">👑 Cuenta VIP</div>'+
+        '<div style="font-size:14px;font-weight:800">Acceso sin restricciones</div>'+
+        '</div>';
+    } else {
+      var dias=diasRestantes();
+      var venceDate=new Date(userSub.vence);
+      var venceTxt=venceDate.toLocaleDateString("es-CL");
+      var color=dias<=0?"#e63946":dias<=3?"#f59e0b":"#22c55e";
+      var estado=dias<=0?"🔒 Expirada (modo solo lectura)":dias===1?"⚠ Último día":dias+" días restantes";
+      subHTML='<div style="width:100%;background:#181818;border-radius:10px;padding:14px;margin-bottom:14px;text-align:left;font-size:13px;border:1px solid '+color+'44">'+
+        '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Periodo de prueba</div>'+
+        '<div style="color:'+color+';font-weight:700;font-size:14px;margin-bottom:4px">'+estado+'</div>'+
+        '<div style="color:var(--muted);font-size:11px">Vence: '+venceTxt+'</div>'+
+        '</div>';
+    }
+  }
+
   var h='<div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px">'+
     '<div style="width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#e63946,#7f1d1d);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:700;margin-bottom:14px">'+(u.displayName||u.email||"?").substring(0,1).toUpperCase()+'</div>'+
     '<h3 style="margin-bottom:4px">'+(u.displayName||"Sin nombre")+'</h3>'+
     '<p style="color:var(--muted);font-size:13px;margin-bottom:18px">'+u.email+'</p>'+
+    subHTML+
     '<div style="width:100%;background:#181818;border-radius:10px;padding:14px;margin-bottom:14px;text-align:left;font-size:13px">'+
       '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">ID de usuario</div>'+
       '<div style="font-family:monospace;color:#aaa;font-size:11px;word-break:break-all">'+u.uid+'</div>'+
@@ -1933,7 +1972,7 @@ function renderDashboard(){
   var hora=new Date().getHours();
   var saludo=hora<12?"Buenos días":hora<19?"Buenas tardes":"Buenas noches";
 
-  var h='<div class="dash-hero">'+
+  var h=bannerSuscripcionHTML()+'<div class="dash-hero">'+
     '<h2>'+saludo+', instructor</h2>'+
     '<div class="big">'+sedeActual().nombre+'</div>'+
     '<div class="sub">'+act.length+' alumnos activos · '+presHoy+' presentes hoy</div></div>'+
@@ -2151,19 +2190,124 @@ async function init(){
   });
 }
 
+// ─── SISTEMA DE SUSCRIPCIÓN / PRUEBA ───────────────────────────────────────
+let userSub=null; // {tipo, vence, activa}
+const DIAS_PRUEBA=7;
+const MS_DIA=24*60*60*1000;
+
+// Carga o crea la suscripción del usuario actual
+async function cargarOCrearSuscripcion(){
+  try{
+    var subDoc=await fsLib.getDoc(fsLib.doc(db,"escuelas/"+currentUser.uid+"/meta","suscripcion"));
+    if(subDoc.exists()){
+      userSub=subDoc.data();
+    } else {
+      // Primera vez → crear prueba de 7 días
+      var hoy=new Date();
+      var vence=new Date(hoy.getTime()+DIAS_PRUEBA*MS_DIA);
+      userSub={
+        tipo:"prueba",
+        fechaInicio:hoy.toISOString(),
+        vence:vence.toISOString(),
+        activa:true,
+        email:currentUser.email||""
+      };
+      await fsLib.setDoc(fsLib.doc(db,"escuelas/"+currentUser.uid+"/meta","suscripcion"),userSub);
+    }
+  }catch(e){
+    console.error("Error cargando suscripción:",e);
+    userSub={tipo:"prueba",vence:new Date(Date.now()+DIAS_PRUEBA*MS_DIA).toISOString(),activa:true};
+  }
+}
+
+// Devuelve días restantes (puede ser negativo si ya venció)
+function diasRestantes(){
+  if(!userSub)return DIAS_PRUEBA;
+  if(userSub.tipo==="vip"||userSub.tipo==="permanente")return 9999;
+  if(!userSub.activa)return -1;
+  var vence=new Date(userSub.vence);
+  var hoy=new Date();
+  return Math.ceil((vence-hoy)/MS_DIA);
+}
+
+// ¿La cuenta está vigente (puede escribir)?
+function suscripcionVigente(){
+  if(!userSub)return false;
+  if(userSub.tipo==="vip"||userSub.tipo==="permanente")return true;
+  if(!userSub.activa)return false;
+  return new Date(userSub.vence)>new Date();
+}
+
+// Banner visual en el dashboard según estado
+function bannerSuscripcionHTML(){
+  if(!userSub)return"";
+  if(userSub.tipo==="vip"||userSub.tipo==="permanente")return"";
+  var dias=diasRestantes();
+  if(dias>3)return""; // No mostrar si quedan más de 3 días
+  if(dias<=0){
+    return'<div style="background:#3a1010;border:2px solid #e63946;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">'+
+      '<div style="font-size:24px;margin-bottom:6px">🔒</div>'+
+      '<div style="font-weight:800;color:#e63946;margin-bottom:4px">Tu periodo de prueba expiró</div>'+
+      '<div style="font-size:12px;color:#ffc1c1">La app pasó a modo solo lectura. Contacta al administrador para reactivarla.</div>'+
+      '</div>';
+  }
+  if(dias===1){
+    return'<div style="background:#3a1010;border:1px solid #e63946;border-radius:10px;padding:12px;margin-bottom:14px;color:#ffc1c1;font-size:13px">'+
+      '<b>⚠ Último día de prueba</b><br>Tu acceso completo vence hoy. Contacta al administrador para continuar.'+
+      '</div>';
+  }
+  return'<div style="background:#3a2510;border:1px solid #f4c430;border-radius:10px;padding:12px;margin-bottom:14px;color:#ffd97a;font-size:13px">'+
+    '<b>⏰ Quedan '+dias+' días de prueba</b><br>Después de este periodo, la app pasará a modo solo lectura.'+
+    '</div>';
+}
+
+// Bloqueador: se llama antes de cualquier escritura crítica
+function bloquearSiVencido(accion){
+  if(suscripcionVigente())return false;
+  mostrarModalExpirado();
+  return true;
+}
+
+// Modal cuando se intenta escribir sin tener suscripción vigente
+function mostrarModalExpirado(){
+  var dias=diasRestantes();
+  openModal("🔒 Modo solo lectura",
+    '<div style="text-align:center;padding:10px">'+
+    '<div style="font-size:54px;margin-bottom:12px">🔒</div>'+
+    '<h3 style="color:#e63946;margin-bottom:10px">Periodo de prueba expirado</h3>'+
+    '<p style="color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:14px">'+
+    'Tu periodo de prueba de '+DIAS_PRUEBA+' días terminó.<br>'+
+    'La app está en <b>modo solo lectura</b>: puedes ver toda tu información pero no agregar/editar nuevos datos.</p>'+
+    '<div class="card2" style="text-align:left;margin-bottom:14px;font-size:13px">'+
+    '<div style="color:var(--muted);margin-bottom:6px">📊 Tus datos están a salvo:</div>'+
+    '<div>✓ Alumnos, pagos, asistencia: visibles</div>'+
+    '<div>✓ Exámenes y eventos: visibles</div>'+
+    '<div>✓ Inscripciones: visibles</div>'+
+    '</div>'+
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:14px">'+
+    'Para reactivar tu cuenta, contacta al administrador.</p>'+
+    '<button class="btn btn-outline" onclick="closeModal()" style="width:100%">Entendido</button>'+
+    '</div>'
+  );
+}
+
 async function init2(){
-  // Si es un usuario recién registrado, creamos su escuela inicial con el nombre que ingresó
+  // 1. Cargar/crear suscripción ANTES que nada
+  await cargarOCrearSuscripcion();
+
+  // 2. Si es un usuario recién registrado, creamos su escuela inicial con el nombre que ingresó
   try{
     var sedesDoc=await fsLib.getDoc(fsLib.doc(db,"escuelas/"+currentUser.uid+"/meta","sedes"));
     if(sedesDoc.exists()&&sedesDoc.data().lista&&sedesDoc.data().lista.length>0){
       sedes=sedesDoc.data().lista;
     } else {
-      // Primera vez: usar el nombre de escuela del registro si existe
       var nombreEscuela=(pendingNewUser&&pendingNewUser.escuela)||"Mi Escuela";
       sedes=[{id:"s1",nombre:nombreEscuela,logo:"",dias:[]}];
       await saveSedes();
       pendingNewUser=null;
-      setTimeout(function(){toast("¡Bienvenido! Tu escuela está lista","#22c55e");},1200);
+      setTimeout(function(){
+        toast("¡Bienvenido! Tienes "+DIAS_PRUEBA+" días de prueba gratis 🎁","#22c55e");
+      },1200);
     }
   } catch(e){
     console.error("Error cargando sedes:",e);
@@ -2173,11 +2317,8 @@ async function init2(){
   await cargarTodo();
   document.getElementById("loading-screen").style.display="none";
   updateHeader();renderSedeBar();
-  // Publicar info de escuela para el formulario de inscripción
   actualizarEscuelaPublica();
-  // Cargar inscripciones pendientes en segundo plano
   cargarPendientes();
-  // Iniciar auto-refresco cada 60 segundos
   iniciarAutoRefresco();
   goTab("dashboard");
 }
