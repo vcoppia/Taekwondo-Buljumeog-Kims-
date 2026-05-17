@@ -1,5 +1,5 @@
 // TKD Academia - Service Worker
-const CACHE_VERSION = 'tkd-v2.6-notif-insc';
+const CACHE_VERSION = 'tkd-v2.7-fix-pendientes';
 const CACHE_FILES = [
   './',
   './index.html',

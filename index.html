@@ -13,7 +13,7 @@
 <title>TKD Academia</title>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyB0HAqybo2uiRVIK2odh0S-QgbSaBDIlH8",
@@ -28,7 +28,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 window.db = db;
 window.auth = auth;
-window.fsLib = { collection, doc, setDoc, getDocs, deleteDoc, getDoc };
+window.fsLib = { collection, doc, setDoc, getDocs, deleteDoc, getDoc, query, where };
 window.authLib = { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile };
 window.firebaseReady = true;
 window.dispatchEvent(new Event("firebase-ready"));
@@ -617,12 +617,17 @@ async function actualizarEscuelaPublica(){
 async function cargarPendientes(){
   if(!currentUser)return;
   try{
-    var snap=await fsLib.getDocs(fsLib.collection(db,"inscripciones_publicas"));
+    // Consulta filtrada: solo las inscripciones de MI escuela
+    var q=fsLib.query(
+      fsLib.collection(db,"inscripciones_publicas"),
+      fsLib.where("escuelaUid","==",currentUser.uid)
+    );
+    var snap=await fsLib.getDocs(q);
     var nuevasInscripciones=[];
     pendientes=[];
     snap.forEach(function(d){
       var data=d.data();
-      if(data.escuelaUid===currentUser.uid&&data.estado==="pendiente"){
+      if(data.estado==="pendiente"){
         var obj=Object.assign({_docId:d.id},data);
         pendientes.push(obj);
         // Si NO es la primera carga y no la conocíamos → es nueva
@@ -774,7 +779,8 @@ function copiarLink(){
 
 // Renderiza la tab de inscripciones pendientes
 function renderInscripciones(){
-  var root=document.getElementById("app-root");
+  var root=document.getElementById("content");
+  if(!root)return;
   var html='<div style="padding:14px">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap">'+
     '<h2 style="font-size:18px">📝 Inscripciones pendientes</h2>'+
