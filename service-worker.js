@@ -1,5 +1,5 @@
 // TKD Academia - Service Worker
-const CACHE_VERSION = 'tkd-v3.1-planes';
+const CACHE_VERSION = 'tkd-v3.3-spam-aviso';
 const CACHE_FILES = [
   './',
   './index.html',

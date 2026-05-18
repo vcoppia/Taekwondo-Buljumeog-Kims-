@@ -278,6 +278,7 @@ button{cursor:pointer;font-family:inherit;border:none;outline:none}
   <div class="drawer-item" onclick="cerrarDrawer();goTab('curriculum')"><span class="ico">📚</span> Programa técnico</div>
   <div class="drawer-item" onclick="cerrarDrawer();goTab('calendario')"><span class="ico">📅</span> Calendario y eventos</div>
   <div class="drawer-item" onclick="cerrarDrawer();goTab('competencias')"><span class="ico">🏆</span> Competencias</div>
+  <div class="drawer-item" onclick="cerrarDrawer();goTab('torneos')"><span class="ico">🥋</span> Torneos (inscripciones)</div>
   <div class="drawer-item" onclick="cerrarDrawer();goTab('comunicados')"><span class="ico">📢</span> Comunicados</div>
   <div class="drawer-item" onclick="cerrarDrawer();goTab('inscripciones')"><span class="ico">📝</span> Inscripciones <span id="badge-pendientes" style="margin-left:auto;background:#e63946;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;display:none">0</span></div>
   <div class="drawer-item" onclick="cerrarDrawer();modalLinkInscripcion()"><span class="ico">🔗</span> Generar link de inscripción</div>
@@ -394,7 +395,7 @@ let tab="dashboard",grupo="ninos",asisFecha=HOY;
 let pagoMes=MES,pagoAno=ANO,pagoGrupo="ninos",examGrupo="ninos",asisGrupo="ninos";
 let calMes=MES,calAno=ANO,compGrupo="ninos";
 let sedes=[],sedeId="",logoDataUrl="",diasSel=[];
-let DB={alumnos:[],asistencia:{},pagos:{},examenes:[],eventos:[],competencias:[],curriculum:{},config:{}};
+let DB={alumnos:[],asistencia:{},pagos:{},examenes:[],eventos:[],competencias:[],torneos:[],curriculum:{},config:{}};
 let db,fsLib,auth,authLib;
 let currentUser=null,pendingNewUser=null;
 
@@ -413,6 +414,61 @@ function edad(nac){
   var d=parseFecha(nac);if(!d)return"?";
   var h=new Date();
   return h.getFullYear()-d.getFullYear()-(h<new Date(h.getFullYear(),d.getMonth(),d.getDate())?1:0);
+}
+
+// Categorías de peso oficiales World Taekwondo (Olímpicas y de Federación)
+function categoriaPeso(pesoKg,edadAnios,grupo){
+  if(!pesoKg||pesoKg<=0)return"-";
+  var p=parseFloat(pesoKg);
+  var ed=parseInt(edadAnios)||0;
+
+  // CADETES (12-14 años)
+  if(grupo==="ninos"&&ed>=12&&ed<=14){
+    if(p<=33)return"-33 kg";
+    if(p<=37)return"-37 kg";
+    if(p<=41)return"-41 kg";
+    if(p<=45)return"-45 kg";
+    if(p<=49)return"-49 kg";
+    if(p<=53)return"-53 kg";
+    if(p<=57)return"-57 kg";
+    if(p<=61)return"-61 kg";
+    if(p<=65)return"-65 kg";
+    return"+65 kg";
+  }
+  // INFANTILES (menores 12)
+  if(grupo==="ninos"||ed<12){
+    if(p<=20)return"-20 kg";
+    if(p<=23)return"-23 kg";
+    if(p<=26)return"-26 kg";
+    if(p<=29)return"-29 kg";
+    if(p<=32)return"-32 kg";
+    if(p<=36)return"-36 kg";
+    if(p<=40)return"-40 kg";
+    if(p<=44)return"-44 kg";
+    return"+44 kg";
+  }
+  // JUVENILES (15-17 años)
+  if(ed>=15&&ed<=17){
+    if(p<=45)return"-45 kg";
+    if(p<=48)return"-48 kg";
+    if(p<=51)return"-51 kg";
+    if(p<=55)return"-55 kg";
+    if(p<=59)return"-59 kg";
+    if(p<=63)return"-63 kg";
+    if(p<=68)return"-68 kg";
+    if(p<=73)return"-73 kg";
+    if(p<=78)return"-78 kg";
+    return"+78 kg";
+  }
+  // ADULTOS / SENIORS (18+)
+  if(p<=54)return"-54 kg";
+  if(p<=58)return"-58 kg";
+  if(p<=63)return"-63 kg";
+  if(p<=68)return"-68 kg";
+  if(p<=74)return"-74 kg";
+  if(p<=80)return"-80 kg";
+  if(p<=87)return"-87 kg";
+  return"+87 kg";
 }
 function tag(txt,color){return'<span class="tag" style="background:'+color+'20;color:'+color+';border:1px solid '+color+'40">'+txt+'</span>';}
 function cinBadge(c,sz){
@@ -481,15 +537,18 @@ async function cargarTodo(){
     fsGetAll(p+"examenes"),
     fsGetAll(p+"eventos"),
     fsGetAll(p+"competencias"),
+    fsGetAll(p+"torneos"),
     fsGetDoc(p+"meta","asistencia"),
     fsGetDoc(p+"meta","pagos"),
     fsGetDoc(p+"meta","curriculum"),
     fsGetDoc(p+"meta","config")
   ]);
-  DB.alumnos=res[0];DB.examenes=res[1];DB.eventos=res[2];DB.competencias=res[3];
-  DB.asistencia=res[4]||{};DB.pagos=res[5]||{};
-  DB.curriculum=res[6]||{};DB.config=res[7]||{};
+  DB.alumnos=res[0];DB.examenes=res[1];DB.eventos=res[2];DB.competencias=res[3];DB.torneos=res[4]||[];
+  DB.asistencia=res[5]||{};DB.pagos=res[6]||{};
+  DB.curriculum=res[7]||{};DB.config=res[8]||{};
 }
+async function saveTorneo(t){await fsSet(pref()+"torneos",t.id,t);}
+async function delTorneo(id){await fsDel(pref()+"torneos",id);}
 async function saveAsistencia(){await fsSet(pref()+"meta","asistencia",DB.asistencia);}
 async function savePagos(){await fsSet(pref()+"meta","pagos",DB.pagos);}
 async function saveAlumno(a){await fsSet(pref()+"alumnos",a.id,a);}
@@ -583,7 +642,12 @@ async function hacerRecuperar(){
     errEl.textContent="Enviando...";errEl.style.color="#888";
     await authLib.sendPasswordResetEmail(auth,email);
     errEl.style.color="#22c55e";
-    errEl.textContent="✓ Revisa tu correo para recuperar tu contraseña";
+    errEl.innerHTML='<div style="font-weight:700;margin-bottom:6px">✓ Email enviado a:<br>'+email+'</div>'+
+      '<div style="background:#3a2510;border:1px solid #f4c430;border-radius:8px;padding:10px;margin-top:10px;color:#ffd97a;text-align:left;font-size:12px;font-weight:400">'+
+      '<b>⚠ IMPORTANTE:</b><br>'+
+      'Si no encuentras el correo en tu bandeja de entrada, revisa la carpeta <b>SPAM</b> o <b>Correo no deseado</b>.<br><br>'+
+      'El remitente es <b>noreply@tkd-control-5ae77.firebaseapp.com</b>'+
+      '</div>';
   }catch(e){
     errEl.style.color="#e63946";
     errEl.textContent=traducirErrorAuth(e.code);
@@ -648,7 +712,22 @@ async function cambiarContrasena(){
   try{
     await authLib.sendPasswordResetEmail(auth,currentUser.email);
     closeModal();
-    toast("✓ Email enviado. Revisa tu bandeja de entrada","#22c55e");
+    setTimeout(function(){
+      openModal("✉ Email enviado",
+        '<div style="text-align:center;padding:8px">'+
+        '<div style="font-size:48px;margin-bottom:10px">✉</div>'+
+        '<div style="font-weight:700;margin-bottom:6px;color:#22c55e">Email enviado correctamente</div>'+
+        '<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Enviado a:<br><b style="color:#fff">'+currentUser.email+'</b></div>'+
+        '<div style="background:#3a2510;border:1px solid #f4c430;border-radius:10px;padding:12px;text-align:left;font-size:12px;color:#ffd97a;margin-bottom:14px">'+
+          '<b>⚠ IMPORTANTE: Revisa también Spam</b><br>'+
+          'Si no encuentras el correo en pocos minutos, revisa tu carpeta <b>SPAM</b> o <b>Correo no deseado</b>.<br><br>'+
+          'El remitente aparece como:<br><b style="color:#fff">noreply@tkd-control-5ae77.firebaseapp.com</b><br><br>'+
+          '💡 <b>Tip:</b> Márcalo como "No es spam" para que futuros emails lleguen bien.'+
+        '</div>'+
+        '<button class="btn btn-red" style="width:100%" onclick="closeModal()">Entendido</button>'+
+        '</div>'
+      );
+    },200);
   }catch(e){
     toast("Error: "+traducirErrorAuth(e.code),"#e63946");
   }
@@ -1180,6 +1259,7 @@ function formAlumnoHTML(a){
     '<div class="field"><label>Estado</label><select id="f-estado">'+["Activo","Inactivo","Baja"].map(function(s){return'<option'+(s===a.estado?" selected":"")+'>'+s+'</option>';}).join('')+'</select></div></div>'+
     '<div class="field"><label>Fecha cinturón actual (para examen)</label><input type="date" id="f-fcin" value="'+(a.fechaCinturonActual||"")+'"/></div>'+
     '<div class="field"><label>Cuota mensual $ (personalizada)</label><input type="number" id="f-cuota" value="'+(a.cuota||0)+'"/></div>'+
+    '<div class="field"><label>Peso (kg) <span style="color:var(--muted);font-weight:400">- para torneos</span></label><input type="number" id="f-peso" step="0.1" min="0" max="200" value="'+(a.peso||"")+'" placeholder="ej: 45.5"/></div>'+
     '<div class="field"><label>Telefono</label><input id="f-tel" value="'+(a.tel||"")+'" placeholder="912345678"/></div>'+
     '<div id="apod-box" style="'+(esNino?"":"display:none")+'">'+
     '<div class="card2" style="margin-bottom:12px;border:1px solid #f59e0b44">'+
@@ -1372,7 +1452,7 @@ function modalVerAlumno(id){
     '<div style="font-size:12px;color:var(--muted);margin-top:3px">'+(a.grupo==="ninos"?"Ninos":"Jovenes")+' · '+edad(a.nac)+' anos · '+asist.pct+'% asis</div>'+
     '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+tag(a.estado,estadoCol(a.estado))+' '+tag(a.cinturon,"#888")+'</div></div></div>'+
     reqHTML+
-    [["RUT",a.rut],["Ingreso",a.ingreso],["Cuota","$"+(a.cuota||0).toLocaleString()+"/mes"],["Tel",a.tel],["Email",a.email],["Apoderado",a.apodNombre],["Tel. Apod.",a.apodTel],["Obs.",a.obs]].filter(function(x){return x[1];}).map(function(x){
+    [["RUT",a.rut],["Ingreso",a.ingreso],["Cuota","$"+(a.cuota||0).toLocaleString()+"/mes"],["Peso",a.peso?a.peso+" kg ("+categoriaPeso(a.peso,edad(a.nac),a.grupo)+")":""],["Tel",a.tel],["Email",a.email],["Apoderado",a.apodNombre],["Tel. Apod.",a.apodTel],["Obs.",a.obs]].filter(function(x){return x[1];}).map(function(x){
       return'<div style="display:flex;gap:10px;margin-bottom:10px;font-size:13px"><span style="color:var(--muted);min-width:90px;flex-shrink:0">'+x[0]+'</span><span style="font-weight:600">'+x[1]+'</span></div>';
     }).join('')+
     medHTML+
@@ -1401,7 +1481,7 @@ async function guardarAlumno(id){
   var obj={
     nombre:nombre,rut:g("f-rut").trim(),grupo:g("f-grupo"),nac:g("f-nac"),ingreso:g("f-ingreso"),
     cinturon:g("f-cin"),estado:g("f-estado"),fechaCinturonActual:g("f-fcin"),
-    cuota:+(g("f-cuota"))||0,tel:g("f-tel"),email:g("f-email"),obs:g("f-obs"),
+    cuota:+(g("f-cuota"))||0,peso:+(g("f-peso"))||0,tel:g("f-tel"),email:g("f-email"),obs:g("f-obs"),
     apodNombre:g("f-apod-nombre"),apodTel:g("f-apod-tel"),
     sangre:g("f-sangre"),prevision:g("f-prevision"),alergias:g("f-alergias"),
     enfermedades:g("f-enfermedades"),medicamentos:g("f-medicamentos"),emergencia:g("f-emergencia"),
@@ -2176,6 +2256,289 @@ function goTab(t){
   if(tabEl)tabEl.classList.add("active");
   render();
 }
+
+// ── TORNEOS (INSCRIPCIONES) ─────────────────────────────────────────────────
+let torneoActivo=null; // id del torneo abierto
+
+function renderTorneos(){
+  // Si hay un torneo abierto, mostrar la pantalla de inscripción
+  if(torneoActivo){
+    var t=DB.torneos.find(function(x){return x.id===torneoActivo;});
+    if(!t){torneoActivo=null;renderTorneos();return;}
+    renderTorneoDetalle(t);
+    return;
+  }
+
+  var lista=DB.torneos.slice().sort(function(a,b){return(b.fecha||"")<(a.fecha||"")?-1:1;});
+  var h='<div style="padding:14px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+    '<h2 style="font-size:18px">🥋 Torneos</h2>'+
+    '<button class="btn btn-red" style="padding:8px 14px;font-size:12px" onclick="modalNuevoTorneo()">+ Nuevo torneo</button>'+
+    '</div>';
+
+  if(lista.length===0){
+    h+='<div class="card2" style="text-align:center;padding:40px 20px;color:var(--muted)">'+
+      '<div style="font-size:48px;margin-bottom:10px;opacity:0.5">🏆</div>'+
+      '<div style="font-weight:600;margin-bottom:6px">Aún no hay torneos</div>'+
+      '<div style="font-size:12px;margin-bottom:14px">Crea uno para inscribir a tus alumnos</div>'+
+      '<button class="btn btn-red" style="padding:10px 20px" onclick="modalNuevoTorneo()">+ Crear primer torneo</button>'+
+      '</div>';
+  } else {
+    lista.forEach(function(t){
+      var fechaTxt=t.fecha?new Date(t.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"}):"Sin fecha";
+      var insK=(t.inscritosKyorugui||[]).length;
+      var insP=(t.inscritosPoomsae||[]).length;
+      h+='<div class="card2" style="margin-bottom:10px;cursor:pointer" onclick="abrirTorneo(\''+t.id+'\')">'+
+        '<div style="display:flex;gap:12px;align-items:center">'+
+          '<div style="width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,#e63946,#7f1d1d);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🥋</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-weight:700;font-size:14px">'+t.nombre+'</div>'+
+            '<div style="font-size:11px;color:var(--muted);margin-top:2px">📅 '+fechaTxt+(t.lugar?' · 📍 '+t.lugar:'')+'</div>'+
+            '<div style="font-size:11px;color:var(--muted);margin-top:3px">⚔ '+insK+' Kyorugui · 🥋 '+insP+' Poomsae</div>'+
+          '</div>'+
+          '<div style="font-size:20px">›</div>'+
+        '</div>'+
+        '</div>';
+    });
+  }
+  h+='</div>';
+  document.getElementById("content").innerHTML=h;
+}
+
+function modalNuevoTorneo(t){
+  t=t||{};
+  var titulo=t.id?"Editar torneo":"Nuevo torneo";
+  openModal(titulo,
+    '<div class="field"><label>Nombre del torneo *</label><input id="t-nombre" value="'+(t.nombre||"")+'" placeholder="Ej: Copa Regional 2026"/></div>'+
+    '<div class="field"><label>Fecha *</label><input type="date" id="t-fecha" value="'+(t.fecha||"")+'"/></div>'+
+    '<div class="field"><label>Lugar</label><input id="t-lugar" value="'+(t.lugar||"")+'" placeholder="Ej: Polideportivo Paine"/></div>'+
+    '<div class="field"><label>Organizador</label><input id="t-org" value="'+(t.organizador||"")+'" placeholder="Federación, club, etc."/></div>'+
+    '<div class="field"><label>Notas</label><textarea id="t-notas" rows="2">'+(t.notas||"")+'</textarea></div>'+
+    '<div style="display:flex;gap:8px">'+
+      (t.id?'<button class="btn btn-outline-red" style="flex:1" onclick="eliminarTorneo(\''+t.id+'\')">🗑 Eliminar</button>':'')+
+      '<button class="btn btn-red" style="flex:2" onclick="guardarTorneo(\''+(t.id||"")+'\')">💾 Guardar</button>'+
+    '</div>'
+  );
+}
+
+async function guardarTorneo(id){
+  var nombre=g("t-nombre").trim();
+  if(!nombre){alert("Ingresa el nombre del torneo");return;}
+  var fecha=g("t-fecha");
+  if(!fecha){alert("Ingresa la fecha");return;}
+  var existente=id?DB.torneos.find(function(x){return x.id===id;}):null;
+  var t={
+    id:id||"t"+Date.now(),
+    nombre:nombre,
+    fecha:fecha,
+    lugar:g("t-lugar").trim(),
+    organizador:g("t-org").trim(),
+    notas:g("t-notas").trim(),
+    inscritosKyorugui:existente?existente.inscritosKyorugui||[]:[],
+    inscritosPoomsae:existente?existente.inscritosPoomsae||[]:[]
+  };
+  await saveTorneo(t);
+  if(existente){
+    Object.assign(existente,t);
+  } else {
+    DB.torneos.push(t);
+  }
+  closeModal();
+  renderTorneos();
+  toast("Torneo guardado","#22c55e");
+}
+
+async function eliminarTorneo(id){
+  if(!confirm("¿Eliminar este torneo? Se perderán todas las inscripciones."))return;
+  await delTorneo(id);
+  DB.torneos=DB.torneos.filter(function(x){return x.id!==id;});
+  closeModal();
+  torneoActivo=null;
+  renderTorneos();
+  toast("Torneo eliminado","#888");
+}
+
+function abrirTorneo(id){
+  torneoActivo=id;
+  renderTorneos();
+}
+
+function volverATorneos(){
+  torneoActivo=null;
+  renderTorneos();
+}
+
+function renderTorneoDetalle(t){
+  var insK=t.inscritosKyorugui||[];
+  var insP=t.inscritosPoomsae||[];
+
+  // Ordenar alumnos por nombre
+  var alumnos=DB.alumnos.slice().sort(function(a,b){return(a.nombre||"").localeCompare(b.nombre||"");});
+
+  var fechaTxt=t.fecha?new Date(t.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"}):"";
+
+  var h='<div style="padding:14px">';
+  // Header del torneo
+  h+='<div style="background:linear-gradient(135deg,#1a0a0a,#2a0505);border:1px solid #e63946;border-radius:14px;padding:14px;margin-bottom:14px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+    '<button class="btn btn-outline" style="padding:6px 10px;font-size:11px" onclick="volverATorneos()">← Torneos</button>'+
+    '<button class="btn btn-outline" style="padding:6px 10px;font-size:11px" onclick="modalNuevoTorneo(DB.torneos.find(function(x){return x.id===\''+t.id+'\';}))">✏ Editar</button>'+
+    '</div>'+
+    '<div style="font-weight:800;font-size:17px;margin-bottom:4px">🥋 '+t.nombre+'</div>'+
+    '<div style="font-size:12px;color:#ffc1c1">📅 '+fechaTxt+(t.lugar?' · 📍 '+t.lugar:'')+'</div>'+
+    (t.organizador?'<div style="font-size:11px;color:var(--muted);margin-top:2px">Organiza: '+t.organizador+'</div>':'')+
+    '</div>';
+
+  // Resumen
+  h+='<div class="stats-row" style="grid-template-columns:1fr 1fr">'+
+    '<div class="stat-box"><div class="stat-n" style="color:#e63946">'+insK.length+'</div><div class="stat-l">⚔ Kyorugui</div></div>'+
+    '<div class="stat-box"><div class="stat-n" style="color:#f4c430">'+insP.length+'</div><div class="stat-l">🥋 Poomsae</div></div>'+
+    '</div>';
+
+  // Botón descargar
+  h+='<button class="btn btn-red" style="width:100%;margin-bottom:14px;padding:11px" onclick="descargarExcelTorneo(\''+t.id+'\')">📗 Descargar Excel</button>';
+
+  if(alumnos.length===0){
+    h+='<div class="card2" style="text-align:center;color:var(--muted);padding:30px">Aún no hay alumnos registrados</div>';
+  } else {
+    // Tabla de inscripción
+    h+='<div style="overflow-x:auto;margin:0 -14px;padding:0 14px">';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:540px">';
+    h+='<thead><tr style="background:#181818;color:var(--muted);text-align:left">'+
+      '<th style="padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Alumno</th>'+
+      '<th style="padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Cinturón</th>'+
+      '<th style="padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;text-align:center">Edad</th>'+
+      '<th style="padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Cat. Peso</th>'+
+      '<th style="padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;text-align:center">⚔</th>'+
+      '<th style="padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;text-align:center">🥋</th>'+
+      '</tr></thead><tbody>';
+    alumnos.forEach(function(a){
+      var ed=edad(a.nac);
+      var cat=categoriaPeso(a.peso,ed,a.grupo);
+      var inK=insK.indexOf(a.id)>-1;
+      var inP=insP.indexOf(a.id)>-1;
+      var bgRow=a.estado==="Activo"?"transparent":"#1a1a1a";
+      var op=a.estado==="Activo"?"1":"0.5";
+      h+='<tr style="border-bottom:1px solid #222;background:'+bgRow+';opacity:'+op+'">'+
+        '<td style="padding:8px 6px;font-weight:600">'+a.nombre+'</td>'+
+        '<td style="padding:8px 6px">'+(a.cinturon||"-")+'</td>'+
+        '<td style="padding:8px 6px;text-align:center">'+ed+'</td>'+
+        '<td style="padding:8px 6px;font-size:11px;color:'+(cat==="-"?"var(--muted)":"#f4c430")+'">'+cat+'</td>'+
+        '<td style="padding:8px 6px;text-align:center"><input type="checkbox" '+(inK?"checked":"")+' onchange="toggleInscripcion(\''+t.id+'\',\''+a.id+'\',\'K\',this.checked)"/></td>'+
+        '<td style="padding:8px 6px;text-align:center"><input type="checkbox" '+(inP?"checked":"")+' onchange="toggleInscripcion(\''+t.id+'\',\''+a.id+'\',\'P\',this.checked)"/></td>'+
+        '</tr>';
+    });
+    h+='</tbody></table></div>';
+
+    // Aviso de peso faltante
+    var sinPeso=alumnos.filter(function(a){return(insK.indexOf(a.id)>-1||insP.indexOf(a.id)>-1)&&(!a.peso||a.peso<=0);});
+    if(sinPeso.length>0){
+      h+='<div style="background:#3a2510;border:1px solid #f4c430;border-radius:10px;padding:12px;margin-top:14px;font-size:12px;color:#ffd97a">'+
+        '<b>⚠ '+sinPeso.length+' alumno(s) inscrito(s) sin peso registrado</b><br>'+
+        'Edítalos en la ficha del alumno para que aparezca su categoría de peso.'+
+        '</div>';
+    }
+  }
+
+  h+='</div>';
+  document.getElementById("content").innerHTML=h;
+}
+
+async function toggleInscripcion(torneoId,alumnoId,modalidad,checked){
+  var t=DB.torneos.find(function(x){return x.id===torneoId;});
+  if(!t)return;
+  var lista=modalidad==="K"?(t.inscritosKyorugui||[]):(t.inscritosPoomsae||[]);
+  if(checked){
+    if(lista.indexOf(alumnoId)===-1)lista.push(alumnoId);
+  } else {
+    var idx=lista.indexOf(alumnoId);
+    if(idx>-1)lista.splice(idx,1);
+  }
+  if(modalidad==="K")t.inscritosKyorugui=lista;
+  else t.inscritosPoomsae=lista;
+  await saveTorneo(t);
+  // Re-render para actualizar contador
+  renderTorneoDetalle(t);
+}
+
+async function descargarExcelTorneo(torneoId){
+  var t=DB.torneos.find(function(x){return x.id===torneoId;});
+  if(!t)return;
+  if(typeof XLSX==="undefined"){alert("Librería XLSX no cargada");return;}
+
+  var insK=t.inscritosKyorugui||[];
+  var insP=t.inscritosPoomsae||[];
+
+  if(insK.length===0&&insP.length===0){
+    alert("No hay alumnos inscritos. Marca al menos uno en Kyorugui o Poomsae.");
+    return;
+  }
+
+  function filaAlumno(a){
+    var ed=edad(a.nac);
+    var cat=categoriaPeso(a.peso,ed,a.grupo);
+    return{
+      "Nombre":a.nombre||"",
+      "RUT":a.rut||"",
+      "Cinturón":a.cinturon||"",
+      "Edad":ed,
+      "Peso (kg)":a.peso||"",
+      "Categoría de Peso":cat,
+      "Grupo":a.grupo==="ninos"?"Niños":"Jóvenes/Adultos",
+      "Apoderado":a.apodNombre||"",
+      "Tel. Apoderado":a.apodTel||""
+    };
+  }
+
+  var alumnosK=insK.map(function(id){return DB.alumnos.find(function(a){return a.id===id;});}).filter(Boolean).sort(function(a,b){return(a.nombre||"").localeCompare(b.nombre||"");});
+  var alumnosP=insP.map(function(id){return DB.alumnos.find(function(a){return a.id===id;});}).filter(Boolean).sort(function(a,b){return(a.nombre||"").localeCompare(b.nombre||"");});
+
+  var datosK=alumnosK.map(filaAlumno);
+  var datosP=alumnosP.map(filaAlumno);
+
+  var wb=XLSX.utils.book_new();
+
+  // Hoja Kyorugui
+  if(datosK.length>0){
+    var wsK=XLSX.utils.json_to_sheet(datosK);
+    wsK["!cols"]=[{wch:25},{wch:13},{wch:14},{wch:6},{wch:9},{wch:14},{wch:14},{wch:25},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsK,"Kyorugui");
+  } else {
+    var wsKEmpty=XLSX.utils.aoa_to_sheet([["Sin inscritos en Kyorugui"]]);
+    XLSX.utils.book_append_sheet(wb,wsKEmpty,"Kyorugui");
+  }
+
+  // Hoja Poomsae
+  if(datosP.length>0){
+    var wsP=XLSX.utils.json_to_sheet(datosP);
+    wsP["!cols"]=[{wch:25},{wch:13},{wch:14},{wch:6},{wch:9},{wch:14},{wch:14},{wch:25},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsP,"Poomsae");
+  } else {
+    var wsPEmpty=XLSX.utils.aoa_to_sheet([["Sin inscritos en Poomsae"]]);
+    XLSX.utils.book_append_sheet(wb,wsPEmpty,"Poomsae");
+  }
+
+  // Hoja resumen
+  var resumen=[
+    ["TORNEO",t.nombre],
+    ["Fecha",t.fecha||""],
+    ["Lugar",t.lugar||""],
+    ["Organizador",t.organizador||""],
+    [],
+    ["Total Kyorugui",datosK.length],
+    ["Total Poomsae",datosP.length],
+    [],
+    ["Generado",new Date().toLocaleString("es-CL")]
+  ];
+  var wsRes=XLSX.utils.aoa_to_sheet(resumen);
+  wsRes["!cols"]=[{wch:18},{wch:35}];
+  XLSX.utils.book_append_sheet(wb,wsRes,"Resumen");
+
+  var nombreArchivo=(t.nombre||"Torneo").replace(/[^a-zA-Z0-9\s]/g,"").replace(/\s+/g,"_")+"_"+(t.fecha||"").replace(/-/g,"")+".xlsx";
+  XLSX.writeFile(wb,nombreArchivo);
+  toast("✓ Excel descargado","#22c55e");
+}
+
 function render(){
   if(tab==="dashboard")renderDashboard();
   else if(tab==="alumnos")renderAlumnos();
@@ -2185,6 +2548,7 @@ function render(){
   else if(tab==="calendario")renderCalendario();
   else if(tab==="curriculum")renderCurriculum();
   else if(tab==="competencias")renderCompetencias();
+  else if(tab==="torneos")renderTorneos();
   else if(tab==="comunicados")renderComunicados();
   else if(tab==="inscripciones")renderInscripciones();
 }
