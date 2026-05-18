@@ -2322,6 +2322,7 @@ function modalNuevoTorneo(t){
 }
 
 async function guardarTorneo(id){
+  var g=function(k){var el=document.getElementById(k);return el?el.value:"";};
   var nombre=g("t-nombre").trim();
   if(!nombre){alert("Ingresa el nombre del torneo");return;}
   var fecha=g("t-fecha");
